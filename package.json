@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/generate_audio.js && vite build",
-    "preview": "vite preview"
+    "build": "vite build",
+    "preview": "vite preview",
+    "generate:audio": "node scripts/generate_audio.js"
   },
   "dependencies": {
     "@types/node": "^22.10.2",
