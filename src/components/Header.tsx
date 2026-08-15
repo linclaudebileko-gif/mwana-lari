@@ -84,7 +84,7 @@ export const Header: React.FC<HeaderProps> = ({
         if (hasUpdate) {
           setUpdateStatusMessage('✨ Une nouvelle version est disponible ! Cliquez sur Actualiser pour l\'appliquer.');
         } else {
-          setUpdateStatusMessage('✅ Votre application Mwana Lari est à jour avec les 335 mots et tous les contes !');
+          setUpdateStatusMessage('✅ Votre application Mwana Lari est à jour avec les 529 mots et tous les contes !');
         }
       }, 800);
     } catch {
@@ -361,7 +361,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>Nouveautés actives :</span>
               </div>
               <ul className="list-disc pl-5 space-y-1 text-savanna-800">
-                <li><strong>335 Mots Lari MBUTA</strong> avec phonétique et audio HD</li>
+                <li><strong>529 Mots Lari MBUTA</strong> (Cuisine, Proverbes, Traditions & Histoire Kongo)</li>
                 <li><strong>Studio Micro des Bambuta</strong> pour enregistrer contes et voix</li>
                 <li><strong>5 Niveaux Pédagogiques</strong> filtrables dans le Dictionnaire</li>
                 <li><strong>100% Responsive</strong> sur Mobile, Tablette, PC & Écrans Larges</li>

@@ -133,7 +133,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, onSelectTab, onSt
               📚 Dictionnaire
             </h3>
             <p className="text-[11px] sm:text-xs text-savanna-800 font-medium mt-0.5 sm:mt-1 line-clamp-2">
-              335 mots Lari avec audio HD
+              +500 mots Lari avec audio HD
             </p>
           </div>
         </div>
