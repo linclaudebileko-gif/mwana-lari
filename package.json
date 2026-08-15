@@ -4,23 +4,21 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node serve.js",
-    "build": "node scripts/generate_audio.js && node build.js",
-    "preview": "node serve.js",
-    "generate:audio": "node scripts/generate_audio.js"
+    "dev": "vite",
+    "build": "node scripts/generate_audio.js && vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "clsx": "^2.1.1",
-    "esbuild": "^0.25.0",
-    "lucide-react": "^0.469.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "tailwind-merge": "^2.6.0"
-  },
-  "devDependencies": {
     "@types/node": "^22.10.2",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
-    "typescript": "^5.7.2"
+    "@vitejs/plugin-react": "^4.3.4",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.469.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.6.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7"
   }
 }
