@@ -205,6 +205,55 @@ def seed_database():
             db.commit()
             print(f"[SEED] OK - {len(stories_data)} contes et proverbes patrimoniaux inseres.")
 
+        # 6. Seed Subscription Plans
+        from ..models.subscription import SubscriptionPlan
+        if db.query(SubscriptionPlan).count() == 0:
+            plans_data = [
+                SubscriptionPlan(
+                    id="plan_free",
+                    name="Découverte (Gratuit)",
+                    tier="FREE",
+                    billing_period="MONTHLY",
+                    price_xaf=0,
+                    price_eur=0.0,
+                    max_children=1,
+                    description="Pour s'initier aux premiers mots de Lari."
+                ),
+                SubscriptionPlan(
+                    id="plan_family_monthly",
+                    name="Famille Mwana Lari (Mensuel)",
+                    tier="FAMILY",
+                    billing_period="MONTHLY",
+                    price_xaf=1500,
+                    price_eur=2.49,
+                    max_children=3,
+                    description="Accès complet aux 529 mots, contes et jeux pour la famille."
+                ),
+                SubscriptionPlan(
+                    id="plan_family_annual",
+                    name="Famille Mwana Lari (Annuel)",
+                    tier="FAMILY",
+                    billing_period="ANNUAL",
+                    price_xaf=15000,
+                    price_eur=24.99,
+                    max_children=3,
+                    description="Accès annuel complet avec 2 mois offerts."
+                ),
+                SubscriptionPlan(
+                    id="plan_clan_monthly",
+                    name="Grand Clan & Diaspora",
+                    tier="CLAN_DIASPORA",
+                    billing_period="MONTHLY",
+                    price_xaf=2500,
+                    price_eur=4.99,
+                    max_children=10,
+                    description="Pour les grandes familles et la diaspora avec profils illimités."
+                )
+            ]
+            db.add_all(plans_data)
+            db.commit()
+            print("[SEED] OK - Forfaits d'abonnement Mobile Money inseres en base.")
+
         print("[SEED] Base de donnees Mwana Lari initialisee et peuplee avec succes !")
 
     finally:
@@ -212,3 +261,4 @@ def seed_database():
 
 if __name__ == "__main__":
     seed_database()
+
