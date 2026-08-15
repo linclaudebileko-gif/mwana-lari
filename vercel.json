@@ -1,5 +1,6 @@
 {
-  "buildCommand": "node scripts/generate_audio.js && vite build",
+  "framework": "vite",
+  "buildCommand": "vite build",
   "outputDirectory": "dist",
   "rewrites": [
     {
