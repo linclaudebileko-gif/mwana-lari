@@ -202,13 +202,13 @@ function MwanaLariApp() {
       />
 
       {/* Navigation Tabs Subheader */}
-      <nav className="bg-white/80 border-b border-brand-300 backdrop-blur-md sticky top-[69px] z-40 px-4 py-2 shadow-sm">
-        <div className="max-w-7xl mx-auto flex items-center gap-2 overflow-x-auto scrollbar-none">
+      <nav className="bg-white/90 border-b border-brand-300 backdrop-blur-md sticky top-[60px] sm:top-[69px] z-40 px-2 sm:px-4 py-1.5 sm:py-2 shadow-sm">
+        <div className="max-w-7xl mx-auto flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none touch-pan-x">
           
           <button
             id="nav-tab-dashboard"
             onClick={() => handleTabChange('dashboard')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
               activeTab === 'dashboard'
                 ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
                 : 'text-savanna-900 hover:bg-savanna-200/60'
@@ -221,86 +221,86 @@ function MwanaLariApp() {
           <button
             id="nav-tab-audiolab"
             onClick={() => handleTabChange('audiolab')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
               activeTab === 'audiolab'
                 ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
                 : 'text-savanna-900 hover:bg-savanna-200/60'
             }`}
           >
-            <Volume2 className="w-4 h-4" />
-            <span>Studio Audio & Prononciation</span>
+            <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span>Studio Audio</span>
           </button>
 
           <button
             id="nav-tab-games"
             onClick={() => handleTabChange('games')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
               activeTab === 'games'
                 ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
                 : 'text-savanna-900 hover:bg-savanna-200/60'
             }`}
           >
-            <Gamepad2 className="w-4 h-4 text-emerald-600" />
-            <span>Jeux de Koko (4 modes)</span>
+            <Gamepad2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
+            <span>Jeux de Koko (4)</span>
           </button>
 
           <button
             id="nav-tab-dictionary"
             onClick={() => handleTabChange('dictionary')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
               activeTab === 'dictionary'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30 ring-2 ring-blue-300'
                 : 'text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200'
             }`}
           >
-            <BookOpen className="w-4 h-4 text-blue-600" />
-            <span>📚 Grand Dictionnaire (+300 mots)</span>
+            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
+            <span>Grand Dictionnaire (+300)</span>
           </button>
 
           <button
             id="nav-tab-heritage"
             onClick={() => handleTabChange('heritage')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
               activeTab === 'heritage'
                 ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
                 : 'text-savanna-900 hover:bg-savanna-200/60'
             }`}
           >
             <span>👵</span>
-            <span>Voix des Aînés & Contes</span>
+            <span>Voix des Aînés</span>
           </button>
 
           <button
             id="nav-tab-family"
             onClick={() => handleTabChange('family')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
               activeTab === 'family'
                 ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
                 : 'text-savanna-900 hover:bg-savanna-200/60'
             }`}
           >
-            <Users className="w-4 h-4" />
-            <span>Espace Famille</span>
+            <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span>Famille</span>
           </button>
 
           <button
             id="nav-tab-school"
             onClick={() => handleTabChange('school')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
               activeTab === 'school'
                 ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
                 : 'text-savanna-900 hover:bg-savanna-200/60'
             }`}
           >
-            <GraduationCap className="w-4 h-4" />
-            <span>Espace École & Classes</span>
+            <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span>École</span>
           </button>
 
         </div>
       </nav>
 
       {/* Main Content View Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-2.5 sm:px-4 py-4 sm:py-6">
         {activeTab === 'dashboard' && (
           <Dashboard
             profile={activeChild}

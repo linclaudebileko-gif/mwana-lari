@@ -84,7 +84,7 @@ export const Header: React.FC<HeaderProps> = ({
         if (hasUpdate) {
           setUpdateStatusMessage('✨ Une nouvelle version est disponible ! Cliquez sur Actualiser pour l\'appliquer.');
         } else {
-          setUpdateStatusMessage('✅ Votre application Mwana Lari est à jour avec les derniers mots et contes !');
+          setUpdateStatusMessage('✅ Votre application Mwana Lari est à jour avec les 335 mots et tous les contes !');
         }
       }, 800);
     } catch {
@@ -95,25 +95,25 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="sticky top-0 z-50 glass-card border-b border-brand-300 px-4 py-3 shadow-md">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+      <header className="sticky top-0 z-50 glass-card border-b border-brand-300 px-2 sm:px-4 py-2.5 sm:py-3 shadow-md">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-1.5 sm:gap-4">
           
           {/* Left: Logo & Title */}
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-brand-500 via-amber-400 to-terracotta-500 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-brand-500/30 transform hover:scale-105 transition-transform cursor-pointer">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-brand-500 via-amber-400 to-terracotta-500 flex items-center justify-center text-white font-bold text-lg sm:text-xl shadow-md shadow-brand-500/30 transform hover:scale-105 transition-transform cursor-pointer">
               🇨🇬
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-2xl tracking-tight bg-gradient-to-r from-brand-700 via-terracotta-600 to-forest-700 bg-clip-text text-transparent">
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <span className="font-extrabold text-lg sm:text-2xl tracking-tight bg-gradient-to-r from-brand-700 via-terracotta-600 to-forest-700 bg-clip-text text-transparent">
                   Mwana Lari
                 </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-forest-100 text-forest-800 font-bold border border-forest-500/30 flex items-center gap-1">
-                  <Database className="w-2.5 h-2.5 text-forest-600" />
+                <span className="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-forest-100 text-forest-800 font-bold border border-forest-500/30 flex items-center gap-0.5 sm:gap-1">
+                  <Database className="w-2 sm:w-2.5 h-2 sm:h-2.5 text-forest-600" />
                   v2.1
                 </span>
               </div>
-              <p className="text-xs text-savanna-800 font-medium hidden sm:block">
+              <p className="text-[11px] text-savanna-800 font-medium hidden md:block">
                 Apprendre sa langue • Comprendre ses racines
               </p>
             </div>
@@ -121,25 +121,25 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Center: Gamification Stats (XP, Streaks, Baobab Tree) */}
           {activeRole === 'CHILD' && (
-            <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-1.5 sm:gap-3">
               {/* Streak Counter */}
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-gradient-to-r from-orange-100 to-amber-100 border border-orange-300 shadow-sm">
-                <Flame className="w-4 h-4 text-orange-600 animate-bounce" />
-                <span className="font-extrabold text-xs text-orange-950">
-                  {profile.streakDays} jours
+              <div className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl sm:rounded-2xl bg-gradient-to-r from-orange-100 to-amber-100 border border-orange-300 shadow-sm">
+                <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-600 animate-bounce flex-shrink-0" />
+                <span className="font-extrabold text-[11px] sm:text-xs text-orange-950">
+                  {profile.streakDays} <span className="hidden xs:inline">j</span>
                 </span>
               </div>
 
               {/* XP Points */}
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-gradient-to-r from-brand-100 to-amber-100 border border-brand-300 shadow-sm">
-                <Sparkles className="w-4 h-4 text-brand-600" />
-                <span className="font-extrabold text-xs text-savanna-950">
-                  {profile.xpPoints} XP
+              <div className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl sm:rounded-2xl bg-gradient-to-r from-brand-100 to-amber-100 border border-brand-300 shadow-sm">
+                <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand-600 flex-shrink-0" />
+                <span className="font-extrabold text-[11px] sm:text-xs text-savanna-950">
+                  {profile.xpPoints} <span className="hidden xs:inline">XP</span>
                 </span>
               </div>
 
               {/* Baobab Growth Level */}
-              <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-gradient-to-r from-forest-100 to-emerald-100 border border-forest-300 shadow-sm">
+              <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-gradient-to-r from-forest-100 to-emerald-100 border border-forest-300 shadow-sm">
                 <TreePine className="w-4 h-4 text-forest-600" />
                 <span className="font-extrabold text-xs text-forest-950">
                   Baobab Niv. {profile.level}
@@ -149,7 +149,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
 
           {/* Right: Actions, Updates, Network & Profile */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             
             {/* Updates Button */}
             <button
@@ -157,24 +157,24 @@ export const Header: React.FC<HeaderProps> = ({
                 setIsUpdateModalOpen(true);
                 handleCheckUpdates();
               }}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-brand-100 hover:bg-brand-200 border border-brand-300 text-brand-900 text-xs font-extrabold transition-all shadow-sm active:scale-95"
+              className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-brand-100 hover:bg-brand-200 border border-brand-300 text-brand-900 text-xs font-extrabold transition-all shadow-sm active:scale-95"
               title="Vérifier les mises à jour"
             >
-              <RefreshCw className="w-3.5 h-3.5 text-brand-700" />
+              <RefreshCw className="w-3.5 h-3.5 text-brand-700 flex-shrink-0" />
               <span className="hidden sm:inline">Mises à jour</span>
             </button>
 
             {/* Network / PWA Status Badge */}
-            <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-extrabold border shadow-sm bg-savanna-100 border-savanna-300 text-savanna-900">
+            <div className="hidden xs:flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-extrabold border shadow-sm bg-savanna-100 border-savanna-300 text-savanna-900">
               {isOnline ? (
                 <>
-                  <Wifi className="w-3.5 h-3.5 text-forest-600" />
-                  <span className="hidden sm:inline">En Ligne</span>
+                  <Wifi className="w-3.5 h-3.5 text-forest-600 flex-shrink-0" />
+                  <span className="hidden md:inline">En Ligne</span>
                 </>
               ) : (
                 <>
-                  <WifiOff className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Hors-ligne (PWA)</span>
+                  <WifiOff className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                  <span className="hidden md:inline">Hors-ligne</span>
                 </>
               )}
             </div>
@@ -184,7 +184,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onManualSync}
                 disabled={isSyncing || !isOnline}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-brand-500 hover:bg-brand-600 text-white shadow-md transition-all ${
+                className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-extrabold bg-brand-500 hover:bg-brand-600 text-white shadow-md transition-all ${
                   isSyncing ? 'opacity-70 cursor-wait' : ''
                 }`}
                 title="Synchroniser la file d'attente vers la base de données"
@@ -199,7 +199,7 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="relative">
                 <button
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-white/90 border-2 border-brand-400 hover:border-brand-500 shadow-sm transition-all text-left"
+                  className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-2xl bg-white/90 border-2 border-brand-400 hover:border-brand-500 shadow-sm transition-all text-left"
                 >
                   <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-brand-500 to-amber-400 flex items-center justify-center text-white font-bold text-xs">
                     {user.fullName ? user.fullName[0].toUpperCase() : 'U'}
@@ -217,7 +217,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                 {/* Dropdown Menu */}
                 {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white border-2 border-brand-200 shadow-2xl p-3 space-y-3 z-50 animate-fadeIn">
+                  <div className="absolute right-0 mt-2 w-64 max-w-[90vw] rounded-2xl bg-white border-2 border-brand-200 shadow-2xl p-3 space-y-3 z-50 animate-fadeIn">
                     <div className="border-b border-brand-100 pb-2">
                       <div className="font-extrabold text-sm text-savanna-950">{user.fullName}</div>
                       <div className="text-xs text-savanna-700 truncate">{user.email}</div>
@@ -300,13 +300,13 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             ) : (
               /* If Not Logged In: Login / Register Buttons */
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <button
                   onClick={() => {
                     setAuthModalMode('login');
                     setIsAuthModalOpen(true);
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-extrabold text-xs shadow-md transition-all flex items-center gap-1"
+                  className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-extrabold text-xs shadow-md transition-all flex items-center gap-1"
                 >
                   <LogIn className="w-3.5 h-3.5" />
                   <span>Connexion</span>
@@ -317,7 +317,7 @@ export const Header: React.FC<HeaderProps> = ({
                     setAuthModalMode('register');
                     setIsAuthModalOpen(true);
                   }}
-                  className="hidden sm:flex px-3 py-1.5 rounded-xl bg-white hover:bg-savanna-100 border border-brand-400 text-savanna-900 font-extrabold text-xs shadow-sm transition-all"
+                  className="hidden md:flex px-3 py-1.5 rounded-xl bg-white hover:bg-savanna-100 border border-brand-400 text-savanna-900 font-extrabold text-xs shadow-sm transition-all"
                 >
                   <span>S'inscrire</span>
                 </button>
@@ -331,25 +331,25 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Interactive Updates Modal */}
       {isUpdateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-          <div className="relative w-full max-w-md rounded-3xl bg-white/95 border-2 border-brand-400 shadow-2xl p-6 sm:p-7 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl bg-white/95 border-2 border-brand-400 shadow-2xl p-5 sm:p-7 space-y-4">
             
             <button
               onClick={() => setIsUpdateModalOpen(false)}
-              className="absolute top-5 right-5 p-2 rounded-full text-savanna-700 hover:text-savanna-950 hover:bg-savanna-100 transition-colors"
+              className="absolute top-4 right-4 p-2 rounded-full text-savanna-700 hover:text-savanna-950 hover:bg-savanna-100 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
 
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-500 to-amber-400 flex items-center justify-center text-white text-2xl shadow-md">
+              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-brand-500 to-amber-400 flex items-center justify-center text-white text-xl sm:text-2xl shadow-md flex-shrink-0">
                 🔄
               </div>
               <div>
-                <h3 className="text-lg font-extrabold text-savanna-950">
+                <h3 className="text-base sm:text-lg font-extrabold text-savanna-950">
                   Centre des Mises à Jour
                 </h3>
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-forest-100 text-forest-800 border border-forest-300">
+                <span className="text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full bg-forest-100 text-forest-800 border border-forest-300">
                   {CURRENT_APP_VERSION}
                 </span>
               </div>
@@ -357,13 +357,14 @@ export const Header: React.FC<HeaderProps> = ({
 
             <div className="p-3.5 rounded-2xl bg-savanna-50 border border-brand-200 text-xs text-savanna-900 font-medium space-y-2">
               <div className="font-extrabold text-savanna-950 flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-forest-600" />
+                <CheckCircle2 className="w-4 h-4 text-forest-600 flex-shrink-0" />
                 <span>Nouveautés actives :</span>
               </div>
               <ul className="list-disc pl-5 space-y-1 text-savanna-800">
-                <li><strong>+300 Mots Lari MBUTA</strong> avec phonétique et audio HD</li>
+                <li><strong>335 Mots Lari MBUTA</strong> avec phonétique et audio HD</li>
                 <li><strong>Studio Micro des Bambuta</strong> pour enregistrer contes et voix</li>
                 <li><strong>5 Niveaux Pédagogiques</strong> filtrables dans le Dictionnaire</li>
+                <li><strong>100% Responsive</strong> sur Mobile, Tablette, PC & Écrans Larges</li>
                 <li><strong>Mode Hors-Ligne Total (PWA)</strong> avec synchronisation automatique</li>
               </ul>
             </div>
@@ -375,12 +376,12 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex items-center justify-end gap-2 sm:gap-3 pt-2">
               <button
                 type="button"
                 onClick={handleCheckUpdates}
                 disabled={isCheckingUpdate}
-                className="px-4 py-2 rounded-xl border border-brand-300 text-savanna-900 font-extrabold text-xs hover:bg-savanna-100 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                className="px-3 sm:px-4 py-2 rounded-xl border border-brand-300 text-savanna-900 font-extrabold text-xs hover:bg-savanna-100 transition-colors flex items-center gap-1.5 disabled:opacity-50"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
                 <span>Vérifier</span>
@@ -391,9 +392,9 @@ export const Header: React.FC<HeaderProps> = ({
                   playSuccessChime();
                   applyAppUpdate();
                 }}
-                className="px-5 py-2 rounded-xl bg-gradient-to-r from-forest-600 to-emerald-600 hover:from-forest-700 hover:to-emerald-700 text-white font-extrabold text-xs shadow-md transition-all active:scale-95"
+                className="px-4 sm:px-5 py-2 rounded-xl bg-gradient-to-r from-forest-600 to-emerald-600 hover:from-forest-700 hover:to-emerald-700 text-white font-extrabold text-xs shadow-md transition-all active:scale-95"
               >
-                Actualiser le Contenu
+                Actualiser
               </button>
             </div>
 

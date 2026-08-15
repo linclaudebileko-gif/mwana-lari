@@ -47,3 +47,8 @@ Desktop.ini
 .idea/
 *.swp
 *.swo
+
+# Archives & Distribution Packages
+*.zip
+*.tar.gz
+*.rar

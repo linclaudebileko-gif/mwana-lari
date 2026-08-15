@@ -314,7 +314,7 @@ export const ContributeStoryModal: React.FC<ContributeStoryModalProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-extrabold text-savanna-900 mb-1">
                 Titre en Lari *
@@ -343,7 +343,7 @@ export const ContributeStoryModal: React.FC<ContributeStoryModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-extrabold text-savanna-900 mb-1 flex items-center gap-1">
                 <User className="w-3 h-3 text-forest-700" />
