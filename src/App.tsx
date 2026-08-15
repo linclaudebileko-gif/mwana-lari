@@ -254,7 +254,7 @@ function MwanaLariApp() {
             }`}
           >
             <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
-            <span>Grand Dictionnaire (+300)</span>
+            <span>Grand Dictionnaire (+500)</span>
           </button>
 
           <button
