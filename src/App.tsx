@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { INITIAL_CHILD_PROFILE, LARI_WORDS, CULTURAL_STORIES } from './data/mockData';
 import { UserRole, ChildProfile } from './types';
 import { Header } from './components/Header';
+import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 import { Dashboard } from './components/Dashboard';
 import { AudioLab } from './components/AudioLab';
 import { Dictionary } from './components/Dictionary';
@@ -33,13 +34,16 @@ function MwanaLariApp() {
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [customRole, setCustomRole] = useState<UserRole | null>(null);
+  const [isUpdateAvailable, setIsUpdateAvailable] = useState<boolean>(false);
 
   const currentRole = customRole || activeRole;
 
   // Initialize PWA, Service Worker, and IndexedDB cache
   useEffect(() => {
-    // 1. Register Service Worker
-    registerServiceWorker();
+    // 1. Register Service Worker with Auto-Update Callback
+    registerServiceWorker(() => {
+      setIsUpdateAvailable(true);
+    });
 
     // 2. Setup network listener
     const unsubscribe = addNetworkStatusListener((online) => {
@@ -87,55 +91,44 @@ function MwanaLariApp() {
   const handleTabChange = (tab: ActiveTab) => {
     playSuccessChime();
     setActiveTab(tab);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleEarnXp = async (amount: number) => {
-    const updatedXp = activeChild.xpPoints + amount;
-    const newLevel = Math.floor(updatedXp / 100) + 1;
-
-    // Update in Context & Local state
+  const handleEarnXp = async (amount: number, lessonId?: string) => {
+    const newXp = activeChild.xpPoints + amount;
+    const newLevel = Math.floor(newXp / 200) + 1;
+    
     updateActiveChildStats({
-      xpPoints: updatedXp,
+      xpPoints: newXp,
       level: newLevel,
     });
 
     // Save to IndexedDB
     await saveLocalChildState({
-      xp: updatedXp,
-      streak: activeChild.streakDays,
+      xp: newXp,
       level: newLevel,
+      streak: activeChild.streakDays,
+      lastUpdated: new Date().toISOString(),
     });
 
-    // Try direct backend sync with SQLite API
-    let syncedDirectly = false;
-    if (isOnline) {
-      try {
-        await lessonsAPI.submitProgress({
-          childId: activeChild.id,
-          lessonId: `quiz_session_${Date.now()}`,
-          score: 100,
-          xpEarned: amount,
-        });
-        syncedDirectly = true;
-      } catch (e) {
-        console.warn('Synchro directe échouée, mise en file d\'attente offline:', e);
+    // If completed a lesson, record progress
+    if (lessonId) {
+      if (isOnline) {
+        try {
+          await lessonsAPI.completeLesson(lessonId, 100, amount);
+        } catch {
+          await queueOfflineProgress(activeChild.id, lessonId, 100, amount);
+          refreshPendingSyncCount();
+        }
+      } else {
+        await queueOfflineProgress(activeChild.id, lessonId, 100, amount);
+        refreshPendingSyncCount();
       }
-    }
-
-    if (!syncedDirectly) {
-      // If offline or failed, record progress item in IndexedDB queue
-      await queueOfflineProgress({
-        childId: activeChild.id,
-        lessonId: `quiz_session_${Date.now()}`,
-        score: 100,
-        xpEarned: amount,
-      });
-      refreshPendingSyncCount();
     }
   };
 
   const handleManualSync = async () => {
-    if (isSyncing || !isOnline) return;
+    if (!isOnline || isSyncing) return;
     setIsSyncing(true);
     try {
       await syncPendingProgressWithBackend();
@@ -161,7 +154,7 @@ function MwanaLariApp() {
   return (
     <div className="min-h-screen flex flex-col bg-savanna-100">
       
-      {/* Header Bar with PWA & Backend API status */}
+      {/* Header Bar with PWA & Backend API status & Updates center */}
       <Header
         profile={activeChild}
         activeRole={currentRole}
@@ -172,104 +165,110 @@ function MwanaLariApp() {
         isSyncing={isSyncing}
       />
 
+      {/* Auto-Update Notification Banner */}
+      <UpdateNotificationBanner
+        isUpdateAvailable={isUpdateAvailable}
+        onDismiss={() => setIsUpdateAvailable(false)}
+      />
+
       {/* Navigation Tabs Subheader */}
       <nav className="bg-white/80 border-b border-brand-300 backdrop-blur-md sticky top-[69px] z-40 px-4 py-2 shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center gap-2 overflow-x-auto scrollbar-none">
           
           <button
             onClick={() => handleTabChange('dashboard')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl font-extrabold text-xs flex-shrink-0 transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
               activeTab === 'dashboard'
                 ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
-                : 'bg-savanna-100 hover:bg-savanna-200 text-savanna-900 border border-brand-200'
+                : 'text-savanna-900 hover:bg-savanna-200/60'
             }`}
           >
-            <BookOpen className="w-4 h-4" />
-            <span>📖 Tableau de Bord</span>
+            <span>🌳</span>
+            <span>Académie & Parcours</span>
           </button>
 
           <button
             onClick={() => handleTabChange('audiolab')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl font-extrabold text-xs flex-shrink-0 transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
               activeTab === 'audiolab'
-                ? 'bg-gradient-to-r from-brand-500 to-amber-500 text-white shadow-md'
-                : 'bg-savanna-100 hover:bg-savanna-200 text-savanna-900 border border-brand-200'
+                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
+                : 'text-savanna-900 hover:bg-savanna-200/60'
             }`}
           >
-            <Mic className="w-4 h-4 text-brand-600" />
-            <span>🎧 Labo Audio</span>
+            <Volume2 className="w-4 h-4" />
+            <span>Studio Audio & Prononciation</span>
           </button>
 
           <button
             onClick={() => handleTabChange('games')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl font-extrabold text-xs flex-shrink-0 transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
               activeTab === 'games'
-                ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-md shadow-purple-500/30'
-                : 'bg-savanna-100 hover:bg-savanna-200 text-savanna-900 border border-brand-200'
+                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
+                : 'text-savanna-900 hover:bg-savanna-200/60'
             }`}
           >
-            <Gamepad2 className="w-4 h-4 text-purple-600" />
-            <span>🎮 Mini-jeux & Énigmes</span>
+            <Gamepad2 className="w-4 h-4 text-emerald-600" />
+            <span>Jeux de Koko (4 modes)</span>
           </button>
 
           <button
             onClick={() => handleTabChange('dictionary')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl font-extrabold text-xs flex-shrink-0 transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
               activeTab === 'dictionary'
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'bg-savanna-100 hover:bg-savanna-200 text-savanna-900 border border-brand-200'
+                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
+                : 'text-savanna-900 hover:bg-savanna-200/60'
             }`}
           >
-            <Sparkles className="w-4 h-4 text-blue-500" />
-            <span>🧠 Dictionnaire</span>
+            <BookOpen className="w-4 h-4" />
+            <span>Grand Dictionnaire (+300 mots)</span>
           </button>
 
           <button
             onClick={() => handleTabChange('heritage')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl font-extrabold text-xs flex-shrink-0 transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
               activeTab === 'heritage'
-                ? 'bg-forest-600 text-white shadow-md'
-                : 'bg-savanna-100 hover:bg-savanna-200 text-savanna-900 border border-brand-200'
+                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
+                : 'text-savanna-900 hover:bg-savanna-200/60'
             }`}
           >
-            <Volume2 className="w-4 h-4 text-forest-600" />
-            <span>👵 Nzolo ya Bakulu</span>
+            <span>👵</span>
+            <span>Voix des Aînés & Contes</span>
           </button>
 
           <button
             onClick={() => handleTabChange('family')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl font-extrabold text-xs flex-shrink-0 transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
               activeTab === 'family'
-                ? 'bg-terracotta-600 text-white shadow-md'
-                : 'bg-savanna-100 hover:bg-savanna-200 text-savanna-900 border border-brand-200'
+                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
+                : 'text-savanna-900 hover:bg-savanna-200/60'
             }`}
           >
-            <Users className="w-4 h-4 text-terracotta-600" />
-            <span>👨‍👩‍👧 Espace Famille</span>
+            <Users className="w-4 h-4" />
+            <span>Espace Famille</span>
           </button>
 
           <button
             onClick={() => handleTabChange('school')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl font-extrabold text-xs flex-shrink-0 transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
               activeTab === 'school'
-                ? 'bg-indigo-600 text-white shadow-md'
-                : 'bg-savanna-100 hover:bg-savanna-200 text-savanna-900 border border-brand-200'
+                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
+                : 'text-savanna-900 hover:bg-savanna-200/60'
             }`}
           >
-            <GraduationCap className="w-4 h-4 text-indigo-600" />
-            <span>🏫 Espace École</span>
+            <GraduationCap className="w-4 h-4" />
+            <span>Espace École & Classes</span>
           </button>
 
         </div>
       </nav>
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+      {/* Main Content View Container */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
         {activeTab === 'dashboard' && (
           <Dashboard
             profile={activeChild}
-            onSelectTab={handleTabChange}
-            onStartLesson={() => handleTabChange('audiolab')}
+            onEarnXp={handleEarnXp}
+            onNavigate={(tab) => handleTabChange(tab as ActiveTab)}
           />
         )}
 
@@ -299,8 +298,10 @@ function MwanaLariApp() {
         <p className="max-w-xl mx-auto font-medium">
           « Apprendre sa langue. Comprendre ses racines. Préparer son avenir. »
         </p>
-        <div className="text-[11px] text-savanna-700 font-semibold">
-          Propulsé par Mwana Languages SaaS Platform • Démonstrateur MVP V1.0 Connecté REST API
+        <div className="text-[11px] text-savanna-700 font-semibold flex items-center justify-center gap-2">
+          <span>Propulsé par Mwana Languages SaaS Platform</span>
+          <span>•</span>
+          <span className="text-forest-700 font-bold">Mises à jour automatiques PWA actives (v2.1)</span>
         </div>
       </footer>
 

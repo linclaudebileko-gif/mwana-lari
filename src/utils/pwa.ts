@@ -1,10 +1,19 @@
 import { getPendingSyncQueue, removePendingSyncItem } from './offlineStorage';
 
 type NetworkStatusCallback = (isOnline: boolean) => void;
+type UpdateAvailableCallback = (version: string) => void;
 
-const listeners: NetworkStatusCallback[] = [];
+const networkListeners: NetworkStatusCallback[] = [];
+let updateAvailableCallback: UpdateAvailableCallback | null = null;
+let waitingWorker: ServiceWorker | null = null;
 
-export const registerServiceWorker = async (): Promise<void> => {
+export const CURRENT_APP_VERSION = 'v2.1.0 (+300 mots MBUTA)';
+
+export const registerServiceWorker = async (onUpdate?: (version: string) => void): Promise<void> => {
+  if (onUpdate) {
+    updateAvailableCallback = onUpdate;
+  }
+
   if ('serviceWorker' in navigator) {
     try {
       const registration = await navigator.serviceWorker.register('/sw.js', {
@@ -12,23 +21,88 @@ export const registerServiceWorker = async (): Promise<void> => {
       });
       console.log('⚡ [PWA] Service Worker enregistré avec succès, scope:', registration.scope);
 
-      // Check for updates
+      // Listen for updates on existing registrations
+      if (registration.waiting) {
+        waitingWorker = registration.waiting;
+        console.log('✨ [PWA] Nouvelle mise à jour en attente d\'activation !');
+        if (updateAvailableCallback) {
+          updateAvailableCallback(CURRENT_APP_VERSION);
+        }
+      }
+
       registration.onupdatefound = () => {
         const installingWorker = registration.installing;
         if (installingWorker) {
           installingWorker.onstatechange = () => {
             if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              console.log('✨ [PWA] Nouvelle version de Mwana Lari disponible !');
+              waitingWorker = installingWorker;
+              console.log('✨ [PWA] Nouvelle version de Mwana Lari prête !');
+              if (updateAvailableCallback) {
+                updateAvailableCallback(CURRENT_APP_VERSION);
+              }
             }
           };
         }
       };
+
+      // Periodic check for new updates every 15 minutes
+      setInterval(() => {
+        registration.update().catch(() => {});
+      }, 15 * 60 * 1000);
+
     } catch (error) {
       console.error('❌ [PWA] Échec d\'enregistrement du Service Worker:', error);
     }
+
+    // Auto reload when new controller takes over
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        refreshing = true;
+        console.log('🔄 [PWA] Rechargement de l\'application pour appliquer la mise à jour...');
+        window.location.reload();
+      }
+    });
   } else {
     console.warn('⚠️ [PWA] Service Worker non supporté sur ce navigateur');
   }
+};
+
+// Manually apply the new service worker update
+export const applyAppUpdate = (): void => {
+  if (waitingWorker) {
+    console.log('🚀 [PWA] Envoi de SKIP_WAITING au Service Worker...');
+    waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+  } else if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistration().then((reg) => {
+      if (reg && reg.waiting) {
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      } else {
+        window.location.reload();
+      }
+    });
+  } else {
+    window.location.reload();
+  }
+};
+
+// Check for updates manually on button click
+export const checkForAppUpdates = async (): Promise<boolean> => {
+  if ('serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) {
+        await reg.update();
+        if (reg.waiting) {
+          waitingWorker = reg.waiting;
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn('Erreur lors de la vérification des mises à jour:', e);
+    }
+  }
+  return false;
 };
 
 export const isOnline = (): boolean => {
@@ -36,15 +110,15 @@ export const isOnline = (): boolean => {
 };
 
 export const addNetworkStatusListener = (cb: NetworkStatusCallback): (() => void) => {
-  listeners.push(cb);
+  networkListeners.push(cb);
   return () => {
-    const idx = listeners.indexOf(cb);
-    if (idx !== -1) listeners.splice(idx, 1);
+    const idx = networkListeners.indexOf(cb);
+    if (idx !== -1) networkListeners.splice(idx, 1);
   };
 };
 
-const notifyListeners = (status: boolean) => {
-  listeners.forEach((cb) => {
+const notifyNetworkListeners = (status: boolean) => {
+  networkListeners.forEach((cb) => {
     try {
       cb(status);
     } catch (e) {
@@ -53,24 +127,23 @@ const notifyListeners = (status: boolean) => {
   });
 };
 
-// Setup global network event listeners
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
     console.log('🟢 [PWA] Connexion Internet rétablie ! Lancement de la synchronisation...');
-    notifyListeners(true);
+    notifyNetworkListeners(true);
     syncPendingProgressWithBackend();
   });
 
   window.addEventListener('offline', () => {
-    console.log('🟠 [PWA] Connexion Internet perdue. Bascule en mode 100% Hors-ligne.');
-    notifyListeners(false);
+    console.log('🟠 [PWA] Connexion Internet perdue. Mode Hors-ligne actif.');
+    notifyNetworkListeners(false);
   });
 }
 
-// Background Sync Engine: Sends queued offline XP / lessons to FastAPI backend
+// Background Sync Engine
 export const syncPendingProgressWithBackend = async (): Promise<{ synced: number; failed: number }> => {
   if (!isOnline()) {
-    console.log('⏸️ [PWA Auto-Sync] Impossible de synchroniser : appareil hors-ligne.');
+    console.log('⏸️ [PWA Auto-Sync] Appareil hors-ligne.');
     return { synced: 0, failed: 0 };
   }
 
@@ -93,7 +166,7 @@ export const syncPendingProgressWithBackend = async (): Promise<{ synced: number
 
   for (const item of queue) {
     try {
-      const response = await fetch('http://localhost:8000/api/v1/progress/submit', {
+      const response = await fetch('/api/v1/progress/submit', {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -114,7 +187,6 @@ export const syncPendingProgressWithBackend = async (): Promise<{ synced: number
         failed++;
       }
     } catch (err) {
-      console.warn('⚠️ [PWA Auto-Sync] Erreur réseau lors de la synchro:', err);
       failed++;
     }
   }
