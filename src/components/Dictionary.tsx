@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { wordsAPI } from '../services/api';
+import React, { useState, useMemo } from 'react';
 import { LARI_WORDS } from '../data/mockData';
 import { WordItem } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -13,41 +12,39 @@ import {
   Plus,
   RefreshCw,
   Database,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   GraduationCap,
-  Layers
+  Layers,
+  X
 } from 'lucide-react';
 import { speakNativeWord, playSuccessChime } from '../utils/audio';
-import { saveOfflineWords, getOfflineWords } from '../utils/offlineStorage';
 import { AddWordModal } from './AddWordModal';
 
 export const Dictionary: React.FC = () => {
   const { user } = useAuth();
-  const [words, setWords] = useState<WordItem[]>(LARI_WORDS);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Toutes');
   const [selectedLevel, setSelectedLevel] = useState<number | 'ALL'>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 24;
-
-  const [loading, setLoading] = useState(false);
+  const [customWords, setCustomWords] = useState<WordItem[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isFromDB, setIsFromDB] = useState(false);
+  const itemsPerPage = 24;
 
   const categories = [
     'Toutes',
     'Salutations',
     'Famille',
     'Corps Humain',
-    'Maison',
-    'Nourriture',
     'Animaux',
+    'Nourriture',
+    'Maison',
+    'Vêtements',
     'Temps & Saisons',
+    'Nature & Éléments',
     'Transports & Ville',
     'Métiers & Activités',
-    'Nature & Éléments',
+    'Personnes',
     'Nombres',
     'Verbes',
     'Sentiments & Qualités',
@@ -55,7 +52,7 @@ export const Dictionary: React.FC = () => {
   ];
 
   const levels = [
-    { id: 'ALL', label: 'Tous Niveaux' },
+    { id: 'ALL', label: 'Tous Niveaux (1 à 5)' },
     { id: 1, label: 'Niv 1 • Découverte (3-5 ans)' },
     { id: 2, label: 'Niv 2 • Initiation (6-8 ans)' },
     { id: 3, label: 'Niv 3 • Communication (9-11 ans)' },
@@ -65,69 +62,51 @@ export const Dictionary: React.FC = () => {
 
   const canAddWords = user && ['ADMIN', 'LINGUIST', 'TEACHER'].includes(user.role);
 
-  // Fetch words with fallback to offline dataset
-  const fetchWords = async () => {
-    setLoading(true);
-    try {
-      const results = await wordsAPI.searchWords({
-        q: searchTerm.trim() || undefined,
-        category: selectedCategory !== 'Toutes' ? selectedCategory : undefined,
-      });
+  // All combined words (335 base words + any newly added custom words)
+  const allAvailableWords = useMemo(() => {
+    return [...customWords, ...LARI_WORDS];
+  }, [customWords]);
 
-      if (results && results.length > 0) {
-        setWords(results);
-        setIsFromDB(true);
-        saveOfflineWords(results as any).catch(() => {});
-      } else {
-        const localMatches = LARI_WORDS.filter((item) => {
-          const matchesSearch =
-            !searchTerm.trim() ||
-            item.wordNative.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.translationFr.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (item.culturalNote && item.culturalNote.toLowerCase().includes(searchTerm.toLowerCase()));
-          const matchesCat = selectedCategory === 'Toutes' || item.category === selectedCategory;
-          const matchesLevel = selectedLevel === 'ALL' || item.difficultyLevel === selectedLevel;
-          return matchesSearch && matchesCat && matchesLevel;
-        });
-        setWords(localMatches);
-      }
-    } catch (err) {
-      console.warn('API non joignable, utilisation du lexique complet:', err);
-      const localMatches = LARI_WORDS.filter((item) => {
-        const matchesSearch =
-          !searchTerm.trim() ||
-          item.wordNative.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.translationFr.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesCat = selectedCategory === 'Toutes' || item.category === selectedCategory;
-        const matchesLevel = selectedLevel === 'ALL' || item.difficultyLevel === selectedLevel;
-        return matchesSearch && matchesCat && matchesLevel;
-      });
-      setWords(localMatches);
-    } finally {
-      setLoading(false);
-      setCurrentPage(1);
-    }
-  };
+  // Instant in-memory filtering (0ms latency, 100% offline & fast)
+  const filteredWords = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    return allAvailableWords.filter((item) => {
+      const matchesSearch =
+        !q ||
+        item.wordNative.toLowerCase().includes(q) ||
+        item.translationFr.toLowerCase().includes(q) ||
+        (item.translationEn && item.translationEn.toLowerCase().includes(q)) ||
+        (item.culturalNote && item.culturalNote.toLowerCase().includes(q)) ||
+        (item.phonetic && item.phonetic.toLowerCase().includes(q));
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchWords();
-    }, 200);
+      const matchesCat = selectedCategory === 'Toutes' || item.category === selectedCategory;
+      const matchesLevel = selectedLevel === 'ALL' || item.difficultyLevel === selectedLevel;
 
-    return () => clearTimeout(timer);
-  }, [searchTerm, selectedCategory, selectedLevel]);
+      return matchesSearch && matchesCat && matchesLevel;
+    });
+  }, [allAvailableWords, searchTerm, selectedCategory, selectedLevel]);
 
-  // Paginated entries
+  // Paginated slice
   const paginatedWords = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
-    return words.slice(start, start + itemsPerPage);
-  }, [words, currentPage]);
+    return filteredWords.slice(start, start + itemsPerPage);
+  }, [filteredWords, currentPage]);
 
-  const totalPages = Math.ceil(words.length / itemsPerPage) || 1;
+  const totalPages = Math.ceil(filteredWords.length / itemsPerPage) || 1;
 
   const handleWordAdded = (newWord: WordItem) => {
-    setWords((prev) => [newWord, ...prev]);
-    setIsFromDB(true);
+    setCustomWords((prev) => [newWord, ...prev]);
+    playSuccessChime();
+  };
+
+  const handleCategorySelect = (cat: string) => {
+    setSelectedCategory(cat);
+    setCurrentPage(1);
+  };
+
+  const handleLevelSelect = (lvlId: number | 'ALL') => {
+    setSelectedLevel(lvlId);
+    setCurrentPage(1);
   };
 
   return (
@@ -139,20 +118,23 @@ export const Dictionary: React.FC = () => {
           <div className="flex items-center gap-2">
             <BookOpen className="w-7 h-7 text-blue-600" />
             <h2 className="font-extrabold text-2xl text-savanna-950">
-              📚 Grande Base Lexicale & Culturelle Lari
+              📚 Grand Dictionnaire Lari — Standard MBUTA
             </h2>
           </div>
           <p className="text-sm text-savanna-900 font-medium mt-1">
-            Explorez plus de 300 mots authentiques Lari certifiés selon le standard <strong>MBUTA</strong> avec phonétique, classes nominales et audio HD !
+            Explorez les <strong>{allAvailableWords.length} mots et expressions Lari authentiques</strong> du Pool et de Brazzaville avec prononciation audio, classes nominales et contextes culturels.
           </p>
-          <div className="flex items-center gap-2 mt-2">
-            <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-blue-100 text-blue-900 border border-blue-200 flex items-center gap-1.5 shadow-sm">
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <span className="text-[11px] font-extrabold px-3 py-1 rounded-full bg-blue-100 text-blue-900 border border-blue-300 flex items-center gap-1.5 shadow-sm">
               <Database className="w-3.5 h-3.5 text-blue-600" />
-              {words.length} entrées lexicales certifiées
+              {allAvailableWords.length} mots enregistrés
             </span>
-            <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-forest-100 text-forest-900 border border-forest-200 flex items-center gap-1.5 shadow-sm">
+            <span className="text-[11px] font-extrabold px-3 py-1 rounded-full bg-forest-100 text-forest-900 border border-forest-300 flex items-center gap-1.5 shadow-sm">
               <ShieldCheck className="w-3.5 h-3.5 text-forest-600" />
-              Standard MBUTA & Brazzaville/Pool
+              Validé MBUTA & Brazzaville/Pool
+            </span>
+            <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+              {filteredWords.length} mot(s) correspondant(s)
             </span>
           </div>
         </div>
@@ -161,10 +143,10 @@ export const Dictionary: React.FC = () => {
           {canAddWords && (
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white font-extrabold text-xs shadow-md transition-all flex items-center gap-1.5"
+              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white font-extrabold text-xs shadow-md transition-all flex items-center gap-1.5 active:scale-95"
             >
               <Plus className="w-4 h-4" />
-              <span>Ajouter un Mot (DB)</span>
+              <span>Ajouter un Mot</span>
             </button>
           )}
 
@@ -174,60 +156,74 @@ export const Dictionary: React.FC = () => {
             <input
               type="text"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Rechercher 'Nitu', 'Mbote', 'Maison'..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/90 border-2 border-blue-300 text-savanna-950 placeholder-savanna-600 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm text-sm"
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Rechercher 'Nitu', 'Mbote', 'Lion', 'Maison'..."
+              className="w-full pl-10 pr-9 py-2.5 rounded-2xl bg-white/90 border-2 border-blue-300 text-savanna-950 placeholder-savanna-600 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm text-sm"
             />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-savanna-500 hover:text-savanna-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Level Selector Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-        <GraduationCap className="w-4 h-4 text-savanna-800 flex-shrink-0 ml-1" />
-        {levels.map((lvl) => (
-          <button
-            key={String(lvl.id)}
-            onClick={() => setSelectedLevel(lvl.id as any)}
-            className={`px-3.5 py-1.5 rounded-2xl text-xs font-extrabold flex-shrink-0 transition-all ${
-              selectedLevel === lvl.id
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'bg-white/80 hover:bg-white text-savanna-800 border border-blue-200'
-            }`}
-          >
-            {lvl.label}
-          </button>
-        ))}
+      <div className="glass-card p-3 rounded-2xl border border-blue-200 shadow-sm space-y-2">
+        <div className="text-[11px] font-extrabold text-savanna-800 flex items-center gap-1.5">
+          <GraduationCap className="w-4 h-4 text-blue-600" />
+          <span>Filtrer par Niveau Pédagogique :</span>
+        </div>
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {levels.map((lvl) => (
+            <button
+              key={String(lvl.id)}
+              onClick={() => handleLevelSelect(lvl.id as any)}
+              className={`px-3.5 py-1.5 rounded-2xl text-xs font-extrabold flex-shrink-0 transition-all ${
+                selectedLevel === lvl.id
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-white/80 hover:bg-white text-savanna-800 border border-blue-200'
+              }`}
+            >
+              {lvl.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Category Pills Filters */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        <Filter className="w-4 h-4 text-savanna-800 flex-shrink-0 ml-1" />
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-extrabold flex-shrink-0 transition-all ${
-              selectedCategory === cat
-                ? 'bg-forest-600 text-white shadow-md'
-                : 'bg-white/80 hover:bg-white text-savanna-800 border border-brand-200'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
+      <div className="glass-card p-3 rounded-2xl border border-forest-200 shadow-sm space-y-2">
+        <div className="text-[11px] font-extrabold text-savanna-800 flex items-center gap-1.5">
+          <Filter className="w-4 h-4 text-forest-600" />
+          <span>Filtrer par Thématique ({categories.length - 1} catégories) :</span>
+        </div>
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => handleCategorySelect(cat)}
+              className={`px-3 py-1.5 rounded-full text-xs font-extrabold flex-shrink-0 transition-all ${
+                selectedCategory === cat
+                  ? 'bg-forest-600 text-white shadow-md'
+                  : 'bg-white/80 hover:bg-white text-savanna-800 border border-brand-200'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Word Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {loading ? (
-          <div className="col-span-full glass-card p-12 rounded-3xl text-center space-y-3">
-            <RefreshCw className="w-8 h-8 mx-auto text-blue-600 animate-spin" />
-            <p className="text-sm font-bold text-savanna-900">
-              Chargement des entrées lexicales...
-            </p>
-          </div>
-        ) : paginatedWords.length > 0 ? (
+        {paginatedWords.length > 0 ? (
           paginatedWords.map((word) => (
             <div
               key={word.id}
@@ -261,10 +257,10 @@ export const Dictionary: React.FC = () => {
                   <h3 className="font-extrabold text-2xl text-savanna-950">
                     {word.wordNative}
                   </h3>
-                  <div className="text-xs font-semibold text-savanna-700 flex items-center gap-2">
+                  <div className="text-xs font-semibold text-savanna-700 flex items-center gap-2 mt-0.5">
                     <span>{word.phonetic}</span>
                     {word.nounClass && (
-                      <span className="text-[10px] bg-savanna-200/70 px-1.5 py-0.5 rounded font-mono text-savanna-900">
+                      <span className="text-[10px] bg-savanna-200/70 px-1.5 py-0.5 rounded font-mono text-savanna-900 font-bold">
                         {word.nounClass}
                       </span>
                     )}
@@ -285,7 +281,7 @@ export const Dictionary: React.FC = () => {
                 {word.exampleSentenceNative && (
                   <div className="bg-blue-50/70 p-2.5 rounded-xl text-xs font-medium text-blue-950 space-y-0.5 border border-blue-100">
                     <div className="font-extrabold text-blue-900">💬 Exemple :</div>
-                    <div>« {word.exampleSentenceNative} »</div>
+                    <div className="font-bold">« {word.exampleSentenceNative} »</div>
                     <div className="text-savanna-800 font-normal">→ {word.exampleSentenceFr}</div>
                   </div>
                 )}
@@ -302,7 +298,7 @@ export const Dictionary: React.FC = () => {
               <div className="flex items-center justify-between text-[11px] font-bold text-forest-700 pt-2 border-t border-savanna-200">
                 <div className="flex items-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5 text-forest-600" />
-                  <span>Validé par {word.speakerName || 'Mbuta Lari'}</span>
+                  <span>Validé par {word.speakerName || 'Mbuta Papa Jean-Baptiste'}</span>
                 </div>
                 <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
                   Audio HD
@@ -316,8 +312,18 @@ export const Dictionary: React.FC = () => {
             <div className="text-4xl">🔍</div>
             <h3 className="font-extrabold text-xl text-savanna-900">Aucun mot trouvé</h3>
             <p className="text-sm text-savanna-800">
-              Essayez une autre recherche ou réinitialisez les filtres.
+              Aucune entrée ne correspond à votre recherche « {searchTerm} ».
             </p>
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setSelectedCategory('Toutes');
+                setSelectedLevel('ALL');
+              }}
+              className="px-4 py-2 rounded-xl bg-blue-600 text-white font-extrabold text-xs shadow-md"
+            >
+              Réinitialiser les filtres
+            </button>
           </div>
         )}
       </div>
@@ -326,17 +332,23 @@ export const Dictionary: React.FC = () => {
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-3 pt-4">
           <button
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            onClick={() => {
+              setCurrentPage((p) => Math.max(1, p - 1));
+              window.scrollTo({ top: 150, behavior: 'smooth' });
+            }}
             disabled={currentPage === 1}
             className="p-2 rounded-xl bg-white border border-savanna-300 text-savanna-800 disabled:opacity-40 hover:bg-savanna-100 transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <span className="text-xs font-extrabold text-savanna-900 px-3 py-1 rounded-xl bg-white border border-savanna-200 shadow-sm">
-            Page {currentPage} sur {totalPages} ({words.length} mots)
+            Page {currentPage} sur {totalPages} ({filteredWords.length} mots affichés)
           </span>
           <button
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() => {
+              setCurrentPage((p) => Math.min(totalPages, p + 1));
+              window.scrollTo({ top: 150, behavior: 'smooth' });
+            }}
             disabled={currentPage === totalPages}
             className="p-2 rounded-xl bg-white border border-savanna-300 text-savanna-800 disabled:opacity-40 hover:bg-savanna-100 transition-colors"
           >
