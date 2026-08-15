@@ -94,7 +94,7 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({ isOpen, onClose, onW
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-extrabold text-savanna-900 mb-1">
                 Mot en Lari *
@@ -123,7 +123,7 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({ isOpen, onClose, onW
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-extrabold text-savanna-900 mb-1">
                 Traduction Français *
@@ -152,7 +152,7 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({ isOpen, onClose, onW
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-extrabold text-savanna-900 mb-1">
                 Catégorie
