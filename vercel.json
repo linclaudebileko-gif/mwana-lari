@@ -1,6 +1,5 @@
 {
-  "framework": "vite",
-  "buildCommand": "vite build",
+  "buildCommand": "node scripts/build.cjs",
   "outputDirectory": "dist",
   "rewrites": [
     {
