@@ -9,8 +9,9 @@ import {
   clearStoredSession,
   setStoredSession
 } from '../services/api';
-import { ChildProfile, UserRole } from '../types';
+import { ChildProfile, UserRole, SubscriptionStatus, SubscriptionTier, PaymentMethod } from '../types';
 import { INITIAL_CHILD_PROFILE } from '../data/mockData';
+import { paymentsAPI } from '../services/api';
 
 interface AuthContextType {
   user: UserSession | null;
@@ -20,6 +21,8 @@ interface AuthContextType {
   activeRole: UserRole;
   activeChild: ChildProfile;
   childrenList: ChildProfile[];
+  subscription: SubscriptionStatus;
+  isPremium: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (payload: RegisterPayload, initialChildName?: string) => Promise<void>;
   logout: () => void;
@@ -29,6 +32,12 @@ interface AuthContextType {
   addChild: (payload: CreateChildPayload) => Promise<ChildProfile>;
   refreshChildren: () => Promise<void>;
   checkHealth: () => Promise<void>;
+  upgradeSubscription: (tier: SubscriptionTier, details: {
+    planName: string;
+    billingCycle: 'monthly' | 'yearly';
+    paymentMethod: PaymentMethod;
+    phoneNumber?: string;
+  }) => Promise<void>;
 }
 
 const DEMO_ACCOUNTS = {
@@ -46,9 +55,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isServerOnline, setIsServerOnline] = useState<boolean>(true);
   const [childrenList, setChildrenList] = useState<ChildProfile[]>([INITIAL_CHILD_PROFILE]);
   const [activeChild, setActiveChildState] = useState<ChildProfile>(INITIAL_CHILD_PROFILE);
+  const [subscription, setSubscription] = useState<SubscriptionStatus>(() => {
+    return paymentsAPI.getLocalSubscription() as SubscriptionStatus;
+  });
 
   // Computed active role: user role if logged in, otherwise 'CHILD'
   const activeRole: UserRole = user ? user.role : 'CHILD';
+  const isPremium: boolean = subscription.isPremium;
 
   const checkHealth = async () => {
     try {
@@ -65,7 +78,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const kids = await parentsAPI.getChildren();
       if (kids && kids.length > 0) {
         setChildrenList(kids);
-        // keep current selected if exists, else first
         setActiveChildState((prev) => {
           const match = kids.find((k) => k.id === prev.id);
           return match || kids[0];
@@ -92,8 +104,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               setChildrenList(kids);
               setActiveChildState(kids[0]);
             }
-          } catch (err) {
-            console.warn('Session restaurée, échec chargement enfants:', err);
+          } catch {
+            // fallback offline
           }
         }
       }
@@ -103,33 +115,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     initAuth();
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, pass: string) => {
     setIsLoading(true);
     try {
-      const session = await authAPI.login(email, password);
+      const session = await authAPI.login(email, pass);
       setUser(session);
-      setIsServerOnline(true);
-
-      // If parent, fetch associated children
       if (session.role === 'PARENT') {
-        try {
-          const kids = await parentsAPI.getChildren();
-          if (kids && kids.length > 0) {
-            setChildrenList(kids);
-            setActiveChildState(kids[0]);
-          } else {
-            // Seed a default child if none
-            const newKid = await parentsAPI.createChild({
-              firstName: 'Kamba',
-              ageGroup: '6-8',
-              avatarId: 'koko_happy',
-            });
-            setChildrenList([newKid]);
-            setActiveChildState(newKid);
-          }
-        } catch (e) {
-          console.warn('Erreur récupération enfants après login:', e);
-        }
+        await refreshChildren();
       }
     } finally {
       setIsLoading(false);
@@ -139,41 +131,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const register = async (payload: RegisterPayload, initialChildName?: string) => {
     setIsLoading(true);
     try {
-      const session = await authAPI.register(payload);
+      const session = await authAPI.register(payload, initialChildName);
       setUser(session);
-      setIsServerOnline(true);
-
-      // If parent, create initial child
       if (session.role === 'PARENT') {
-        try {
-          const newKid = await parentsAPI.createChild({
-            firstName: initialChildName?.trim() || 'Kamba',
-            ageGroup: '6-8',
-            avatarId: 'koko_happy',
-          });
-          setChildrenList([newKid]);
-          setActiveChildState(newKid);
-        } catch (e) {
-          console.warn('Erreur création enfant initial:', e);
-        }
+        await refreshChildren();
       }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const loginAsDemo = async (demoType: 'parent' | 'teacher' | 'linguist' | 'admin') => {
-    const creds = DEMO_ACCOUNTS[demoType];
-    if (creds) {
-      await login(creds.email, creds.password);
-    }
-  };
-
   const logout = () => {
     clearStoredSession();
     setUser(null);
-    setActiveChildState(INITIAL_CHILD_PROFILE);
     setChildrenList([INITIAL_CHILD_PROFILE]);
+    setActiveChildState(INITIAL_CHILD_PROFILE);
+  };
+
+  const loginAsDemo = async (demoType: 'parent' | 'teacher' | 'linguist' | 'admin') => {
+    const creds = DEMO_ACCOUNTS[demoType];
+    await login(creds.email, credds(demoType));
+  };
+
+  // Helper demo password
+  const credds = (type: string) => {
+    return 'MwanaLari2026!';
   };
 
   const setActiveChild = (child: ChildProfile) => {
@@ -183,7 +165,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateActiveChildStats = (stats: Partial<ChildProfile>) => {
     setActiveChildState((prev) => {
       const updated = { ...prev, ...stats };
-      // Update in children list too
       setChildrenList((list) => list.map((k) => (k.id === updated.id ? updated : k)));
       return updated;
     });
@@ -196,6 +177,36 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return newChild;
   };
 
+  const upgradeSubscription = async (
+    tier: SubscriptionTier,
+    details: {
+      planName: string;
+      billingCycle: 'monthly' | 'yearly';
+      paymentMethod: PaymentMethod;
+      phoneNumber?: string;
+    }
+  ) => {
+    const expiryDate = new Date();
+    if (details.billingCycle === 'yearly') {
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+    } else {
+      expiryDate.setMonth(expiryDate.getMonth() + 1);
+    }
+
+    const newSub: SubscriptionStatus = {
+      isPremium: tier !== 'FREE',
+      tier,
+      planName: details.planName,
+      billingCycle: details.billingCycle,
+      expiresAt: expiryDate.toISOString(),
+      phoneNumber: details.phoneNumber,
+      paymentMethod: details.paymentMethod,
+    };
+
+    setSubscription(newSub);
+    paymentsAPI.saveLocalSubscription(newSub);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -206,6 +217,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         activeRole,
         activeChild,
         childrenList,
+        subscription,
+        isPremium,
         login,
         register,
         logout,
@@ -215,6 +228,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         addChild,
         refreshChildren,
         checkHealth,
+        upgradeSubscription,
       }}
     >
       {children}

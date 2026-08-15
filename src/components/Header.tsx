@@ -21,10 +21,13 @@ import {
   Users,
   BookOpen,
   CheckCircle2,
-  X
+  X,
+  Crown,
+  Zap
 } from 'lucide-react';
 import { AuthModal } from './AuthModal';
 import { AddChildModal } from './AddChildModal';
+import { SubscriptionModal } from './SubscriptionModal';
 import { playSuccessChime } from '../utils/audio';
 import { CURRENT_APP_VERSION, checkForAppUpdates, applyAppUpdate } from '../utils/pwa';
 
@@ -47,11 +50,12 @@ export const Header: React.FC<HeaderProps> = ({
   onManualSync,
   isSyncing = false,
 }) => {
-  const { user, isAuthenticated, logout, isServerOnline, childrenList, activeChild, setActiveChild } = useAuth();
+  const { user, isAuthenticated, logout, isServerOnline, childrenList, activeChild, setActiveChild, isPremium, subscription } = useAuth();
   
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
   const [isAddChildModalOpen, setIsAddChildModalOpen] = useState(false);
+  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
@@ -151,6 +155,29 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Right: Actions, Updates, Network & Profile */}
           <div className="flex items-center gap-1.5 sm:gap-2">
             
+            {/* Mobile Money / Subscription Button */}
+            {isPremium ? (
+              <button
+                onClick={() => setIsSubscriptionModalOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-brand-500 hover:brightness-110 text-white text-xs font-black shadow-md shadow-amber-500/20 transition-all active:scale-95 border border-amber-300"
+                title="Gérer votre abonnement Premium"
+              >
+                <Crown className="w-3.5 h-3.5 text-amber-200 fill-amber-200" />
+                <span className="hidden sm:inline">Premium Actif</span>
+                <span className="sm:hidden">VIP</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsSubscriptionModalOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-brand-600 via-amber-500 to-terracotta-600 hover:brightness-110 text-white text-xs font-black shadow-md shadow-brand-500/30 transition-all active:scale-95 animate-pulse"
+                title="S'abonner via MTN MoMo ou Airtel Money (1 500 FCFA)"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-200 fill-amber-200" />
+                <span className="hidden sm:inline">S'abonner (1 500 F)</span>
+                <span className="sm:hidden">1 500 F</span>
+              </button>
+            )}
+
             {/* Updates Button */}
             <button
               onClick={() => {
@@ -413,6 +440,12 @@ export const Header: React.FC<HeaderProps> = ({
       <AddChildModal
         isOpen={isAddChildModalOpen}
         onClose={() => setIsAddChildModalOpen(false)}
+      />
+
+      {/* Subscription & Mobile Money Modal */}
+      <SubscriptionModal
+        isOpen={isSubscriptionModalOpen}
+        onClose={() => setIsSubscriptionModalOpen(false)}
       />
     </>
   );

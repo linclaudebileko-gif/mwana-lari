@@ -4,6 +4,7 @@ from .words import router as words_router
 from .lessons import router as lessons_router
 from .heritage import router as heritage_router
 from .validations import router as validations_router
+from .payments import router as payments_router
 
 __all__ = [
     "auth_router",
@@ -12,4 +13,6 @@ __all__ = [
     "lessons_router",
     "heritage_router",
     "validations_router",
+    "payments_router",
 ]
+
