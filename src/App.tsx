@@ -27,9 +27,25 @@ import { lessonsAPI } from './services/api';
 
 export type ActiveTab = 'dashboard' | 'audiolab' | 'games' | 'dictionary' | 'heritage' | 'family' | 'school';
 
+// Helper to get initial tab from URL hash (#dictionary) or query param (?tab=dictionary)
+const getInitialTab = (): ActiveTab => {
+  if (typeof window !== 'undefined') {
+    const hash = window.location.hash.replace('#', '').toLowerCase();
+    if (['dashboard', 'audiolab', 'games', 'dictionary', 'heritage', 'family', 'school'].includes(hash)) {
+      return hash as ActiveTab;
+    }
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab')?.toLowerCase();
+    if (tabParam && ['dashboard', 'audiolab', 'games', 'dictionary', 'heritage', 'family', 'school'].includes(tabParam)) {
+      return tabParam as ActiveTab;
+    }
+  }
+  return 'dashboard';
+};
+
 function MwanaLariApp() {
   const { activeChild, activeRole, updateActiveChildStats } = useAuth();
-  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(getInitialTab);
   const [isOnline, setIsOnline] = useState<boolean>(checkIsOnline());
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -37,6 +53,19 @@ function MwanaLariApp() {
   const [isUpdateAvailable, setIsUpdateAvailable] = useState<boolean>(false);
 
   const currentRole = customRole || activeRole;
+
+  // Listen to browser hash changes (e.g. #dictionary)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const currentHash = window.location.hash.replace('#', '').toLowerCase();
+      if (['dashboard', 'audiolab', 'games', 'dictionary', 'heritage', 'family', 'school'].includes(currentHash)) {
+        setActiveTab(currentHash as ActiveTab);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Initialize PWA, Service Worker, and IndexedDB cache
   useEffect(() => {
@@ -91,6 +120,7 @@ function MwanaLariApp() {
   const handleTabChange = (tab: ActiveTab) => {
     playSuccessChime();
     setActiveTab(tab);
+    window.location.hash = tab;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -141,13 +171,13 @@ function MwanaLariApp() {
   const handleRoleChange = (role: UserRole) => {
     setCustomRole(role);
     if (role === 'TEACHER') {
-      setActiveTab('school');
+      handleTabChange('school');
     } else if (role === 'ELDER') {
-      setActiveTab('heritage');
+      handleTabChange('heritage');
     } else if (role === 'PARENT') {
-      setActiveTab('family');
+      handleTabChange('family');
     } else {
-      setActiveTab('dashboard');
+      handleTabChange('dashboard');
     }
   };
 
@@ -176,6 +206,7 @@ function MwanaLariApp() {
         <div className="max-w-7xl mx-auto flex items-center gap-2 overflow-x-auto scrollbar-none">
           
           <button
+            id="nav-tab-dashboard"
             onClick={() => handleTabChange('dashboard')}
             className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
               activeTab === 'dashboard'
@@ -188,6 +219,7 @@ function MwanaLariApp() {
           </button>
 
           <button
+            id="nav-tab-audiolab"
             onClick={() => handleTabChange('audiolab')}
             className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
               activeTab === 'audiolab'
@@ -200,6 +232,7 @@ function MwanaLariApp() {
           </button>
 
           <button
+            id="nav-tab-games"
             onClick={() => handleTabChange('games')}
             className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
               activeTab === 'games'
@@ -212,18 +245,20 @@ function MwanaLariApp() {
           </button>
 
           <button
+            id="nav-tab-dictionary"
             onClick={() => handleTabChange('dictionary')}
             className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
               activeTab === 'dictionary'
-                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
-                : 'text-savanna-900 hover:bg-savanna-200/60'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30 ring-2 ring-blue-300'
+                : 'text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200'
             }`}
           >
-            <BookOpen className="w-4 h-4" />
-            <span>Grand Dictionnaire (+300 mots)</span>
+            <BookOpen className="w-4 h-4 text-blue-600" />
+            <span>📚 Grand Dictionnaire (+300 mots)</span>
           </button>
 
           <button
+            id="nav-tab-heritage"
             onClick={() => handleTabChange('heritage')}
             className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
               activeTab === 'heritage'
@@ -236,6 +271,7 @@ function MwanaLariApp() {
           </button>
 
           <button
+            id="nav-tab-family"
             onClick={() => handleTabChange('family')}
             className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
               activeTab === 'family'
@@ -248,6 +284,7 @@ function MwanaLariApp() {
           </button>
 
           <button
+            id="nav-tab-school"
             onClick={() => handleTabChange('school')}
             className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all whitespace-nowrap ${
               activeTab === 'school'
