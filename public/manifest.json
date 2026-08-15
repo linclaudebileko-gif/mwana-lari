@@ -1,0 +1,28 @@
+{
+  "name": "Mwana Lari — Apprendre sa langue. Comprendre ses racines.",
+  "short_name": "Mwana Lari",
+  "description": "Plateforme EdTech & Patrimoine Linguistique Lari pour enfants et familles congolaises.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "background_color": "#fdf6e2",
+  "theme_color": "#f59e0b",
+  "orientation": "portrait-primary",
+  "lang": "fr-CG",
+  "dir": "ltr",
+  "categories": ["education", "culture", "kids"],
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/vite.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
