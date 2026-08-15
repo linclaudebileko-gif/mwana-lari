@@ -23,9 +23,20 @@ copyDir('public', 'dist');
 console.log('🚀 [Build] 3. Compilation TypeScript / React avec esbuild...');
 execSync('npx esbuild src/main.tsx --bundle --outfile=dist/assets/index.js --loader:.tsx=tsx --loader:.ts=ts --jsx=automatic --minify', { stdio: 'inherit' });
 
-console.log('🚀 [Build] 4. Préparation de dist/index.html...');
+console.log('🚀 [Build] 4. Préparation de dist/index.html (compatible racine & sous-dossiers WordPress)...');
 let html = fs.readFileSync('index.html', 'utf8');
-html = html.replace('/src/main.tsx', '/assets/index.js');
+html = html.replace('/src/main.tsx', './assets/index.js');
+html = html.replace('src="/assets/index.js"', 'src="./assets/index.js"');
+html = html.replace('href="/manifest.json"', 'href="./manifest.json"');
+html = html.replace('href="/vite.svg"', 'href="./vite.svg"');
 fs.writeFileSync('dist/index.html', html, 'utf8');
 
-console.log('✅ [Build] Build terminé avec succès dans dist/ (100% autonome et compatible Vercel/Netlify/GitHub) !');
+console.log('📦 [Build] 5. Création de l\'archive ZIP pour le Gestionnaire de Fichiers WordPress (mwana-lari-wp.zip)...');
+try {
+  execSync('powershell -Command "Compress-Archive -Path dist/* -DestinationPath mwana-lari-wp.zip -Force"', { stdio: 'ignore' });
+  console.log('✅ [Build] mwana-lari-wp.zip généré avec succès à la racine du projet !');
+} catch (e) {
+  console.warn('Note: ZIP generation skipped or handled externally');
+}
+
+console.log('✅ [Build] Build terminé avec succès dans dist/ (100% autonome et compatible WordPress / Netlify / Vercel) !');
