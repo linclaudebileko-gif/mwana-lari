@@ -2,16 +2,25 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from .config import settings
 
-# SQLite needs check_same_thread=False
-connect_args = {}
-if settings.DATABASE_URL.startswith("sqlite"):
-    connect_args = {"check_same_thread": False}
+db_url = settings.normalized_database_url
 
-engine = create_engine(
-    settings.DATABASE_URL,
-    connect_args=connect_args,
-    echo=False
-)
+# Configure engine depending on database engine
+if db_url.startswith("sqlite"):
+    engine = create_engine(
+        db_url,
+        connect_args={"check_same_thread": False},
+        echo=False
+    )
+else:
+    # PostgreSQL / Cloud Database (Supabase, Neon, Render, Railway, AWS RDS)
+    engine = create_engine(
+        db_url,
+        pool_pre_ping=True,      # Automatically reconnect dropped cloud connections
+        pool_size=10,            # Maintain 10 persistent connections
+        max_overflow=20,         # Allow up to 20 burst connections
+        pool_recycle=300,        # Recycle connections every 5 minutes
+        echo=False
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -23,3 +32,4 @@ def get_db():
         yield db
     finally:
         db.close()
+

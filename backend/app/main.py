@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import datetime
 from .config import settings
 from .routers import (
     auth_router,
@@ -32,9 +33,13 @@ app = FastAPI(
 )
 
 # CORS Configuration
+allowed_origins_list = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
+if not allowed_origins_list or "*" in allowed_origins_list:
+    allowed_origins_list = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allow all origins for dev & mobile PWA
+    allow_origins=allowed_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -60,3 +65,14 @@ def root():
         "documentation": "/docs",
         "api_v1": settings.API_V1_STR
     }
+
+@app.get("/health")
+@app.get(f"{settings.API_V1_STR}/health")
+def health_check():
+    return {
+        "status": "online",
+        "service": settings.PROJECT_NAME,
+        "version": settings.VERSION,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    }
+
