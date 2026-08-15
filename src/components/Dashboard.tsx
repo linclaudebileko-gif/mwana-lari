@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChildProfile, LessonUnit } from '../types';
 import { KokoMascot } from './KokoMascot';
+import { LessonModal } from './LessonModal';
 import { LESSON_UNITS } from '../data/mockData';
 import { lessonsAPI } from '../services/api';
 import {
@@ -17,19 +18,45 @@ import {
   Gamepad2,
   Database,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 import { playSuccessChime } from '../utils/audio';
 
 interface DashboardProps {
   profile: ChildProfile;
-  onSelectTab: (tab: 'dashboard' | 'audiolab' | 'games' | 'dictionary' | 'heritage' | 'family' | 'school') => void;
-  onStartLesson: (lesson: LessonUnit) => void;
+  onEarnXp?: (amount: number, lessonId?: string) => void;
+  onNavigate?: (tab: string) => void;
+  onSelectTab?: (tab: 'dashboard' | 'audiolab' | 'games' | 'dictionary' | 'heritage' | 'family' | 'school') => void;
+  onStartLesson?: (lesson: LessonUnit) => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ profile, onSelectTab, onStartLesson }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ profile, onEarnXp, onNavigate, onSelectTab, onStartLesson }) => {
   const [lessons, setLessons] = useState<LessonUnit[]>(LESSON_UNITS);
   const [loadingLessons, setLoadingLessons] = useState(false);
   const [isFromDB, setIsFromDB] = useState(false);
+  const [activeLessonModal, setActiveLessonModal] = useState<LessonUnit | null>(null);
+
+  const handleNavigate = (tab: any) => {
+    if (onSelectTab) onSelectTab(tab);
+    else if (onNavigate) onNavigate(tab);
+  };
+
+  const handleLaunchLesson = (unit: LessonUnit) => {
+    playSuccessChime();
+    setActiveLessonModal(unit);
+    if (onStartLesson) onStartLesson(unit);
+  };
+
+  const handleLessonCompleted = (xpEarned: number) => {
+    if (activeLessonModal) {
+      // Mark as completed in local state
+      setLessons(prev => prev.map(l => l.id === activeLessonModal.id ? { ...l, isCompleted: true, progressPercent: 100 } : l));
+      if (onEarnXp) {
+        onEarnXp(xpEarned, activeLessonModal.id);
+      }
+    }
+  };
+
 
   useEffect(() => {
     const fetchLessons = async () => {
@@ -68,7 +95,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, onSelectTab, onSt
         
         {/* Labo Audio Card */}
         <div
-          onClick={() => { playSuccessChime(); onSelectTab('audiolab'); }}
+          onClick={() => { playSuccessChime(); handleNavigate('audiolab'); }}
           className="glass-card p-3.5 sm:p-4 rounded-3xl border-2 border-brand-300 hover:border-brand-500 hover:shadow-xl transition-all cursor-pointer group transform hover:-translate-y-1 flex flex-col justify-between"
         >
           <div>
@@ -86,7 +113,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, onSelectTab, onSt
 
         {/* Mini-Jeux de Koko Card */}
         <div
-          onClick={() => { playSuccessChime(); onSelectTab('games'); }}
+          onClick={() => { playSuccessChime(); handleNavigate('games'); }}
           className="glass-card p-3.5 sm:p-4 rounded-3xl border-2 border-purple-300 hover:border-purple-500 hover:shadow-xl transition-all cursor-pointer group transform hover:-translate-y-1 bg-gradient-to-b from-purple-50/50 to-white flex flex-col justify-between"
         >
           <div>
@@ -104,7 +131,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, onSelectTab, onSt
 
         {/* Voix des Aînés Card */}
         <div
-          onClick={() => { playSuccessChime(); onSelectTab('heritage'); }}
+          onClick={() => { playSuccessChime(); handleNavigate('heritage'); }}
           className="glass-card-forest p-3.5 sm:p-4 rounded-3xl border-2 border-forest-400 hover:border-forest-600 hover:shadow-xl transition-all cursor-pointer group transform hover:-translate-y-1 flex flex-col justify-between"
         >
           <div>
@@ -122,7 +149,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, onSelectTab, onSt
 
         {/* Dictionnaire Intelligent Card */}
         <div
-          onClick={() => { playSuccessChime(); onSelectTab('dictionary'); }}
+          onClick={() => { playSuccessChime(); handleNavigate('dictionary'); }}
           className="glass-card p-3.5 sm:p-4 rounded-3xl border-2 border-blue-300 hover:border-blue-500 hover:shadow-xl transition-all cursor-pointer group transform hover:-translate-y-1 flex flex-col justify-between"
         >
           <div>
@@ -140,7 +167,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, onSelectTab, onSt
 
         {/* Espace Famille Card */}
         <div
-          onClick={() => { playSuccessChime(); onSelectTab('family'); }}
+          onClick={() => { playSuccessChime(); handleNavigate('family'); }}
           className="glass-card-terracotta p-3.5 sm:p-4 rounded-3xl border-2 border-terracotta-400 hover:border-terracotta-600 hover:shadow-xl transition-all cursor-pointer group transform hover:-translate-y-1 col-span-2 sm:col-span-1 flex flex-col justify-between"
         >
           <div>
@@ -167,7 +194,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, onSelectTab, onSt
                 Niveau {profile.level}
               </span>
               <h2 className="font-extrabold text-lg sm:text-2xl text-savanna-900">
-                📖 Académie du Lari — Ton Parcours
+                📖 Académie du Lari — Ton Parcours (10 Unités)
               </h2>
             </div>
             <p className="text-xs sm:text-sm text-savanna-800 mt-1 font-medium">
@@ -185,10 +212,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, onSelectTab, onSt
           {lessons.map((unit, idx) => (
             <div
               key={unit.id}
-              onClick={() => unit.isUnlocked && onStartLesson(unit)}
+              onClick={() => unit.isUnlocked && handleLaunchLesson(unit)}
               className={`p-3.5 sm:p-4 rounded-2xl border-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 ${
                 unit.isCompleted
-                  ? 'bg-forest-50/90 border-forest-400 hover:border-forest-600'
+                  ? 'bg-forest-50/90 border-forest-400 hover:border-forest-600 cursor-pointer'
                   : unit.isUnlocked
                   ? 'bg-white/95 border-brand-400 hover:border-brand-600 hover:shadow-md cursor-pointer'
                   : 'bg-gray-100/70 border-gray-300 opacity-60 cursor-not-allowed'
@@ -228,13 +255,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, onSelectTab, onSt
               {/* Status / Action Button */}
               <div className="flex items-center justify-end gap-2 self-end sm:self-center">
                 {unit.isCompleted ? (
-                  <div className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-forest-100 text-forest-800 text-xs font-extrabold">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleLaunchLesson(unit); }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-forest-100 hover:bg-forest-200 text-forest-800 text-xs font-extrabold transition-all"
+                  >
                     <CheckCircle2 className="w-4 h-4 text-forest-600" />
-                    <span>Maîtrisé</span>
-                  </div>
+                    <span>Réviser</span>
+                  </button>
                 ) : unit.isUnlocked ? (
                   <button
-                    onClick={(e) => { e.stopPropagation(); onStartLesson(unit); }}
+                    onClick={(e) => { e.stopPropagation(); handleLaunchLesson(unit); }}
                     className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-extrabold shadow-md transition-colors active:scale-95"
                   >
                     <Play className="w-3.5 h-3.5 fill-white" />
@@ -254,6 +284,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, onSelectTab, onSt
 
       </div>
 
+      {/* Interactive Lesson Modal */}
+      {activeLessonModal && (
+        <LessonModal
+          lesson={activeLessonModal}
+          onClose={() => setActiveLessonModal(null)}
+          onComplete={handleLessonCompleted}
+        />
+      )}
+
     </div>
   );
 };
+

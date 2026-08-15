@@ -9079,59 +9079,119 @@ export const LESSON_UNITS: LessonUnit[] = [
   {
     "id": "l1",
     "level": 1,
-    "titleFr": "Niveau 1 : Salutations, Famille & Maison",
+    "titleFr": "Unité 1 : Salutations, Politesse & Famille",
     "titleNative": "Mbote na Nzo ya Kanda",
     "description": "Apprends les formules fondamentales (« Mbote », « Bweni ? », « Ntondele ») et les membres du foyer (« Mama », « Tata », « Mbuta »).",
     "icon": "👋",
-    "wordCount": 35,
+    "wordCount": 40,
     "isUnlocked": true,
     "isCompleted": true,
     "progressPercent": 100
   },
   {
     "id": "l2",
-    "level": 2,
-    "titleFr": "Niveau 2 : Le Corps Humain & Les Animaux",
-    "titleNative": "Nitu na Biyilu bi Mfinda",
-    "description": "Nomme les parties du corps (« Ntu », « Meso », « Moko », « Ntima ») et les animaux de la savane (« Nkosi », « Ngo », « Nuni »).",
-    "icon": "🦁",
-    "wordCount": 40,
+    "level": 1,
+    "titleFr": "Unité 2 : Le Corps Humain & La Santé",
+    "titleNative": "Nitu na Mabuka",
+    "description": "Nomme les parties du corps (« Ntu », « Meso », « Moko », « Ntima », « Kulu ») et l'énergie du corps (« Nitu ya ngolo »).",
+    "icon": "🏃",
+    "wordCount": 45,
     "isUnlocked": true,
     "isCompleted": false,
     "progressPercent": 65
   },
   {
     "id": "l3",
-    "level": 3,
-    "titleFr": "Niveau 3 : Métiers, Ville & Le Temps",
-    "titleNative": "Misalu, Zandu na Ntangu",
-    "description": "Découvre les métiers (« Mulongi », « Mubakisi »), la ville (« Zandu », « Nzila ») et les saisons (« Mvula », « Mwini »).",
-    "icon": "🛠️",
-    "wordCount": 45,
+    "level": 2,
+    "titleFr": "Unité 3 : Les Animaux de la Savane & Forêt",
+    "titleNative": "Biyilu bi Mfinda na Savane",
+    "description": "Reconnais les animaux emblématiques (« Nkosi », « Ngo », « Nuni », « Mbisi », « Nioka ») et leurs sons.",
+    "icon": "🦁",
+    "wordCount": 50,
     "isUnlocked": true,
     "isCompleted": false,
-    "progressPercent": 20
+    "progressPercent": 25
   },
   {
     "id": "l4",
-    "level": 4,
-    "titleFr": "Niveau 4 : Nature, Sentiments & Verbes d'Action",
-    "titleNative": "Kiese, Luzolo na Mayele",
-    "description": "Exprime tes émotions (« Luzolo », « Kiese »), décris la nature (« Nzadi », « Mfinda ») et manie les verbes d'action.",
-    "icon": "❤️",
-    "wordCount": 50,
+    "level": 2,
+    "titleFr": "Unité 4 : La Cuisine Congolaise & Plats du Terroir",
+    "titleNative": "Madiya ma Terroir : Saka-saka, Maboke, Kwanga",
+    "description": "Découvre les saveurs du Pool (« Saka-saka », « Maboke », « Kikwanga », « Bitoto », « Ngoki », « Nsafu », « Makemba »).",
+    "icon": "🍲",
+    "wordCount": 55,
     "isUnlocked": false,
     "isCompleted": false,
     "progressPercent": 0
   },
   {
     "id": "l5",
+    "level": 3,
+    "titleFr": "Unité 5 : La Maison, le Foyer & les Objets",
+    "titleNative": "Nzo, Matoko na Bima bia Foyer",
+    "description": "Les pièces de la maison (« Nzo a madiya », « Kuku »), les meubles et objets traditionnels (« Matoko », « Nsaba », « Kinzu »).",
+    "icon": "🏡",
+    "wordCount": 50,
+    "isUnlocked": false,
+    "isCompleted": false,
+    "progressPercent": 0
+  },
+  {
+    "id": "l6",
+    "level": 3,
+    "titleFr": "Unité 6 : Métiers & Artisanat d'Art du Pool",
+    "titleNative": "Misalu, Kinkete na Banganga",
+    "description": "Les métiers du terroir (« Nlongi », « Mukumbi », « Ntungi », « Mufubi », « Mulombi », « Nganga-buka »).",
+    "icon": "🛠️",
+    "wordCount": 55,
+    "isUnlocked": false,
+    "isCompleted": false,
+    "progressPercent": 0
+  },
+  {
+    "id": "l7",
+    "level": 4,
+    "titleFr": "Unité 7 : La Nature, les Éléments & le Fleuve Congo",
+    "titleNative": "Nzadi, Mfinda, Zulu na Ntoto",
+    "description": "Décris les paysages grandioses (« Nzadi », « Nkondo », « Loufoulakari », « Mvula », « Zulu dya nkembo »).",
+    "icon": "🌊",
+    "wordCount": 60,
+    "isUnlocked": false,
+    "isCompleted": false,
+    "progressPercent": 0
+  },
+  {
+    "id": "l8",
+    "level": 4,
+    "titleFr": "Unité 8 : Le Temps, Saisons & Nombres (1 à 1 000)",
+    "titleNative": "Ntangu, Mimvu na Kazi mosi",
+    "description": "Maîtrise le comptage étendu de « Mosi » (1) à « Kazi » (1 000), les jours, mois et saisons du Pool.",
+    "icon": "🔢",
+    "wordCount": 60,
+    "isUnlocked": false,
+    "isCompleted": false,
+    "progressPercent": 0
+  },
+  {
+    "id": "l9",
     "level": 5,
-    "titleFr": "Niveau 5 : Proverbes, Histoire & Sagesses des Aînés",
-    "titleNative": "Bingana na Lusansu lwa Bakulu",
-    "description": "Maîtrise les proverbes ancestraux (« Bingana »), l'histoire du Kongo dia Ntotila et la philosophie du Kimuntu.",
+    "titleFr": "Unité 9 : Sentiments, Sagesse & Relations Humaines",
+    "titleNative": "Bumuntu, Kiese, Zola na Ngemba",
+    "description": "La philosophie humaniste Kongo (« Bumuntu »), l'amour filial (« Zola »), la paix (« Ngemba ») et la solidarité (« Kinsiona »).",
+    "icon": "❤️",
+    "wordCount": 55,
+    "isUnlocked": false,
+    "isCompleted": false,
+    "progressPercent": 0
+  },
+  {
+    "id": "l10",
+    "level": 5,
+    "titleFr": "Unité 10 : Histoire du Royaume Kongo & Proverbes Royaux",
+    "titleNative": "Kongo dia Ntotila, Matsoua na Bingana",
+    "description": "L'épopée de Mbanza Kongo, les figures de la résistance (André Matsoua, Boueta Mbongo) et les grands proverbes séculaires.",
     "icon": "👑",
-    "wordCount": 43,
+    "wordCount": 60,
     "isUnlocked": false,
     "isCompleted": false,
     "progressPercent": 0
@@ -9159,6 +9219,15 @@ export const FAMILY_CHALLENGES: FamilyChallenge[] = [
   },
   {
     "id": "fc3",
+    "title": "Défi Cuisine du Pool : Nommer 3 plats congolais",
+    "description": "Nomme 3 délices culinaires du Pool en Lari (« Saka-saka », « Maboke », « Kikwanga ») au moment du dîner.",
+    "targetCount": 3,
+    "currentCount": 3,
+    "bonusXp": 80,
+    "isCompleted": true
+  },
+  {
+    "id": "fc4",
     "title": "Défi Corps Humain : Nommer 5 parties du corps",
     "description": "Montre et nomme 5 parties du corps en Lari (Ntu, Meso, Matu, Moko, Ntima) sans hésiter.",
     "targetCount": 5,
@@ -9217,280 +9286,154 @@ export const KOKO_RIDDLES: RiddleQuestion[] = [
     "riddleFr": "Je suis le roi majestueux de la forêt. Quand je rugis, tous les animaux m'écoutent avec respect. Qui suis-je en Lari ?",
     "clue": "Indice : Mon nom commence par la lettre \"N\" et se termine par \"si\".",
     "options": [
-      {
-        "id": "o1",
-        "wordNative": "Nkosi",
-        "translationFr": "Lion",
-        "icon": "🦁",
-        "isCorrect": true
-      },
-      {
-        "id": "o2",
-        "wordNative": "Nzo",
-        "translationFr": "Maison",
-        "icon": "🏡",
-        "isCorrect": false
-      },
-      {
-        "id": "o3",
-        "wordNative": "Masa",
-        "translationFr": "Eau",
-        "icon": "💧",
-        "isCorrect": false
-      },
-      {
-        "id": "o4",
-        "wordNative": "Tata",
-        "translationFr": "Papa",
-        "icon": "👨",
-        "isCorrect": false
-      }
+      { "id": "o1", "wordNative": "Nkosi", "translationFr": "Lion", "icon": "🦁", "isCorrect": true },
+      { "id": "o2", "wordNative": "Nzo", "translationFr": "Maison", "icon": "🏡", "isCorrect": false },
+      { "id": "o3", "wordNative": "Masa", "translationFr": "Eau", "icon": "💧", "isCorrect": false },
+      { "id": "o4", "wordNative": "Tata", "translationFr": "Papa", "icon": "👨", "isCorrect": false }
     ],
     "culturalExplanation": "Bravo ! « Nkosi » est le lion en Lari. Dans les contes des aînés, il symbolise la noblesse et le pouvoir."
   },
   {
     "id": "r2",
+    "riddleFr": "C'est le plat national congolais préparé avec des feuilles de manioc pilées au mortier, de l'huile de palme rouge et du poisson fumé. Quel est ce délice en Lari ?",
+    "clue": "Indice : On le mange traditionnellement avec du manioc ou du foufou !",
+    "options": [
+      { "id": "o1", "wordNative": "Saka-saka", "translationFr": "Feuilles de manioc pilées", "icon": "🥬", "isCorrect": true },
+      { "id": "o2", "wordNative": "Maboke", "translationFr": "Poisson en papillote", "icon": "🐟", "isCorrect": false },
+      { "id": "o3", "wordNative": "Makemba", "translationFr": "Bananes plantains", "icon": "🍌", "isCorrect": false },
+      { "id": "o4", "wordNative": "Madesu", "translationFr": "Haricots rouges", "icon": "🫘", "isCorrect": false }
+    ],
+    "culturalExplanation": "Miam ! Le « Saka-saka » est le plat emblématique de la gastronomie congolaise, cuisiné avec amour lors des grandes fêtes de famille."
+  },
+  {
+    "id": "r3",
+    "riddleFr": "Je suis le poisson frais du fleuve cuit à l'étouffée dans des feuilles de marantacées sur la braise ardente. Qui suis-je en Lari ?",
+    "clue": "Indice : Mon parfum embaume les berges du fleuve Congo.",
+    "options": [
+      { "id": "o1", "wordNative": "Maboke", "translationFr": "Poisson en papillote", "icon": "🐟", "isCorrect": true },
+      { "id": "o2", "wordNative": "Kwanga", "translationFr": "Chikwangue", "icon": "🥖", "isCorrect": false },
+      { "id": "o3", "wordNative": "Bitoto", "translationFr": "Ragoût de bananes", "icon": "🍲", "isCorrect": false },
+      { "id": "o4", "wordNative": "Nsafu", "translationFr": "Prune d'Afrique", "icon": "🫐", "isCorrect": false }
+    ],
+    "culturalExplanation": "Excellent ! « Maboke » désigne la cuisson en papillote traditionnelle de feuilles végétales qui préserve toute la saveur du poisson."
+  },
+  {
+    "id": "r4",
     "riddleFr": "C'est le lieu chaleureux où toute la famille se réunit pour partager le bon repas (Madiya) et écouter les contes au clair de lune. Quel est ce lieu en Lari ?",
     "clue": "Indice : On y vit tous ensemble sous un même toit.",
     "options": [
-      {
-        "id": "o1",
-        "wordNative": "Mwana",
-        "translationFr": "Enfant",
-        "icon": "👶",
-        "isCorrect": false
-      },
-      {
-        "id": "o2",
-        "wordNative": "Nzo",
-        "translationFr": "Maison / Foyer",
-        "icon": "🏡",
-        "isCorrect": true
-      },
-      {
-        "id": "o3",
-        "wordNative": "Mbote",
-        "translationFr": "Bonjour",
-        "icon": "👋",
-        "isCorrect": false
-      },
-      {
-        "id": "o4",
-        "wordNative": "Mbuta",
-        "translationFr": "Aîné / Sage",
-        "icon": "👵",
-        "isCorrect": false
-      }
+      { "id": "o1", "wordNative": "Mwana", "translationFr": "Enfant", "icon": "👶", "isCorrect": false },
+      { "id": "o2", "wordNative": "Nzo", "translationFr": "Maison / Foyer", "icon": "🏡", "isCorrect": true },
+      { "id": "o3", "wordNative": "Mbote", "translationFr": "Bonjour", "icon": "👋", "isCorrect": false },
+      { "id": "o4", "wordNative": "Mbuta", "translationFr": "Aîné / Sage", "icon": "👵", "isCorrect": false }
     ],
     "culturalExplanation": "Exact ! « Nzo » désigne la maison et le foyer chaleureux chez les Lari."
   },
   {
-    "id": "r3",
+    "id": "r5",
     "riddleFr": "Il porte les cheveux blancs de la sagesse, connaît tous les contes et a donné son nom à l'application de référence du lari. Qui est-il ?",
     "clue": "Indice : C'est le mot « Mbuta » !",
     "options": [
-      {
-        "id": "o1",
-        "wordNative": "Mbuta",
-        "translationFr": "Aîné / Sage / Doyen",
-        "icon": "👵",
-        "isCorrect": true
-      },
-      {
-        "id": "o2",
-        "wordNative": "Mwana",
-        "translationFr": "Enfant",
-        "icon": "🧒",
-        "isCorrect": false
-      },
-      {
-        "id": "o3",
-        "wordNative": "Nkosi",
-        "translationFr": "Lion",
-        "icon": "🦁",
-        "isCorrect": false
-      },
-      {
-        "id": "o4",
-        "wordNative": "Zole",
-        "translationFr": "Deux",
-        "icon": "2️⃣",
-        "isCorrect": false
-      }
+      { "id": "o1", "wordNative": "Mbuta", "translationFr": "Aîné / Sage / Doyen", "icon": "👵", "isCorrect": true },
+      { "id": "o2", "wordNative": "Mwana", "translationFr": "Enfant", "icon": "🧒", "isCorrect": false },
+      { "id": "o3", "wordNative": "Nkosi", "translationFr": "Lion", "icon": "🦁", "isCorrect": false },
+      { "id": "o4", "wordNative": "Zole", "translationFr": "Deux", "icon": "2️⃣", "isCorrect": false }
     ],
     "culturalExplanation": "Magnifique ! « Mbuta » est l'aîné, le doyen respecté et le gardien de la mémoire et des traditions lari."
   },
   {
-    "id": "r4",
-    "riddleFr": "Je suis l'organe précieux situé dans la poitrine qui bat pour donner la vie et ressent la joie (Kiese) et l'amour (Luzolo). Qui suis-je en Lari ?",
-    "clue": "Indice : On dit « Ntima ya bumbote » pour désigner un cœur généreux.",
+    "id": "r6",
+    "riddleFr": "Je suis le géant végétal séculaire aux branches immenses, symbole de la longévité et de l'enracinement dans le Pool. Quel est cet arbre en Lari ?",
+    "clue": "Indice : Mon nom est « Nkondo » !",
     "options": [
-      {
-        "id": "o1",
-        "wordNative": "Meso",
-        "translationFr": "Yeux",
-        "icon": "👀",
-        "isCorrect": false
-      },
-      {
-        "id": "o2",
-        "wordNative": "Ntima",
-        "translationFr": "Cœur",
-        "icon": "❤️",
-        "isCorrect": true
-      },
-      {
-        "id": "o3",
-        "wordNative": "Moko",
-        "translationFr": "Mains",
-        "icon": "🖐️",
-        "isCorrect": false
-      },
-      {
-        "id": "o4",
-        "wordNative": "Kulu",
-        "translationFr": "Pied",
-        "icon": "🦶",
-        "isCorrect": false
-      }
+      { "id": "o1", "wordNative": "Nkondo", "translationFr": "Baobab sacré", "icon": "🌳", "isCorrect": true },
+      { "id": "o2", "wordNative": "Nsafuti", "translationFr": "Safoutier", "icon": "🌿", "isCorrect": false },
+      { "id": "o3", "wordNative": "Dinanasi", "translationFr": "Ananas", "icon": "🍍", "isCorrect": false },
+      { "id": "o4", "wordNative": "Masa", "translationFr": "Eau", "icon": "💧", "isCorrect": false }
     ],
-    "culturalExplanation": "Excellent ! « Ntima » est le cœur et le siège des sentiments nobles chez les Lari."
+    "culturalExplanation": "Bravo ! « Nkondo » est le grand Baobab, l'arbre sacré sous lequel se réunissent les anciens pour transmettre les récits."
   },
   {
-    "id": "r5",
-    "riddleFr": "Je coule puissamment à travers le Pool et Brazzaville, et mon nom a inspiré le grand royaume historique. Quel est ce fleuve en Lari ?",
+    "id": "r7",
+    "riddleFr": "Je suis l'organe précieux situé dans la poitrine qui bat pour donner la vie et ressent la joie (Kiese) et l'amour (Zola). Qui suis-je en Lari ?",
+    "clue": "Indice : On dit « Ntima mosi » pour désigner la parfaite union des cœurs.",
+    "options": [
+      { "id": "o1", "wordNative": "Meso", "translationFr": "Yeux", "icon": "👀", "isCorrect": false },
+      { "id": "o2", "wordNative": "Ntima", "translationFr": "Cœur", "icon": "❤️", "isCorrect": true },
+      { "id": "o3", "wordNative": "Moko", "translationFr": "Mains", "icon": "🖐️", "isCorrect": false },
+      { "id": "o4", "wordNative": "Kulu", "translationFr": "Pied", "icon": "🦶", "isCorrect": false }
+    ],
+    "culturalExplanation": "Excellent ! « Ntima » est le cœur et le siège des sentiments nobles et généreux chez les Lari."
+  },
+  {
+    "id": "r8",
+    "riddleFr": "Je coule puissamment entre Brazzaville et Kinshasa, et mon nom a inspiré le grand royaume historique millénaire. Quel est ce fleuve en Lari ?",
     "clue": "Indice : « Nzadi ya Kongo » !",
     "options": [
-      {
-        "id": "o1",
-        "wordNative": "Nzadi",
-        "translationFr": "Fleuve",
-        "icon": "🌊",
-        "isCorrect": true
-      },
-      {
-        "id": "o2",
-        "wordNative": "Mfinda",
-        "translationFr": "Forêt",
-        "icon": "🌳",
-        "isCorrect": false
-      },
-      {
-        "id": "o3",
-        "wordNative": "Bwala",
-        "translationFr": "Village",
-        "icon": "🏘️",
-        "isCorrect": false
-      },
-      {
-        "id": "o4",
-        "wordNative": "Tiya",
-        "translationFr": "Feu",
-        "icon": "🔥",
-        "isCorrect": false
-      }
+      { "id": "o1", "wordNative": "Nzadi", "translationFr": "Fleuve Congo", "icon": "🌊", "isCorrect": true },
+      { "id": "o2", "wordNative": "Mfinda", "translationFr": "Forêt", "icon": "🌳", "isCorrect": false },
+      { "id": "o3", "wordNative": "Bwala", "translationFr": "Village", "icon": "🏘️", "isCorrect": false },
+      { "id": "o4", "wordNative": "Tiya", "translationFr": "Feu", "icon": "🔥", "isCorrect": false }
     ],
-    "culturalExplanation": "Bravo ! « Nzadi » est le fleuve. Le fleuve Congo (« Nzadi ya Kongo ») est le cœur battant de la région."
+    "culturalExplanation": "Bravo ! « Nzadi » est le fleuve. Le fleuve Congo (« Nzadi ya Kongo ») est le berceau nourricier et historique de notre peuple."
+  },
+  {
+    "id": "r9",
+    "riddleFr": "Je suis le héros historique et figure de la liberté vénérée dans tout le Pool et à Brazzaville. Qui suis-je en Lari ?",
+    "clue": "Indice : André Grenard...",
+    "options": [
+      { "id": "o1", "wordNative": "Matsoua", "translationFr": "André Grenard Matsoua", "icon": "👑", "isCorrect": true },
+      { "id": "o2", "wordNative": "Ntinu", "translationFr": "Le Roi", "icon": "🤴", "isCorrect": false },
+      { "id": "o3", "wordNative": "Mfumu", "translationFr": "Le Chef", "icon": "🎖️", "isCorrect": false },
+      { "id": "o4", "wordNative": "Mukumbi", "translationFr": "Le Forgeron", "icon": "🔨", "isCorrect": false }
+    ],
+    "culturalExplanation": "Immense respect ! André Grenard « Matsoua » est le grand défenseur de la dignité et des droits fondamentaux du peuple Kongo."
+  },
+  {
+    "id": "r10",
+    "riddleFr": "Je suis l'instrument en bois et peau tendue qui résonne lors des fêtes et mariages pour faire danser tout le village. Qui suis-je en Lari ?",
+    "clue": "Indice : On me bat avec les mains ou des baguettes.",
+    "options": [
+      { "id": "o1", "wordNative": "Ngoma", "translationFr": "Tam-tam / Tambour", "icon": "🪘", "isCorrect": true },
+      { "id": "o2", "wordNative": "Tsentsa", "translationFr": "Maracas", "icon": "🪇", "isCorrect": false },
+      { "id": "o3", "wordNative": "Lukoba", "translationFr": "Pagne", "icon": "👗", "isCorrect": false },
+      { "id": "o4", "wordNative": "Mpemba", "translationFr": "Kaolin blanc", "icon": "⚪", "isCorrect": false }
+    ],
+    "culturalExplanation": "Super ! « Ngoma » est le tambour sacré dont le rythme bat au cœur de toutes les réjouissances et cérémonies traditionnelles."
   }
 ];
 
 export const KOKO_MATCH_PAIRS: MatchPair[] = [
-  {
-    "id": "mp1",
-    "wordNative": "Mbote",
-    "translationFr": "Bonjour",
-    "icon": "👋"
-  },
-  {
-    "id": "mp2",
-    "wordNative": "Mbuta",
-    "translationFr": "Aîné / Sage",
-    "icon": "👵"
-  },
-  {
-    "id": "mp3",
-    "wordNative": "Mama",
-    "translationFr": "Maman",
-    "icon": "👩"
-  },
-  {
-    "id": "mp4",
-    "wordNative": "Tata",
-    "translationFr": "Papa",
-    "icon": "👨"
-  },
-  {
-    "id": "mp5",
-    "wordNative": "Mwana",
-    "translationFr": "Enfant",
-    "icon": "👶"
-  },
-  {
-    "id": "mp6",
-    "wordNative": "Ntondele",
-    "translationFr": "Merci",
-    "icon": "🙏"
-  },
-  {
-    "id": "mp7",
-    "wordNative": "Nzo",
-    "translationFr": "Maison",
-    "icon": "🏡"
-  },
-  {
-    "id": "mp8",
-    "wordNative": "Nitu",
-    "translationFr": "Corps humain",
-    "icon": "🏃"
-  },
-  {
-    "id": "mp9",
-    "wordNative": "Ntima",
-    "translationFr": "Cœur",
-    "icon": "❤️"
-  },
-  {
-    "id": "mp10",
-    "wordNative": "Nkosi",
-    "translationFr": "Lion",
-    "icon": "🦁"
-  },
-  {
-    "id": "mp11",
-    "wordNative": "Ngo",
-    "translationFr": "Léopard",
-    "icon": "🐆"
-  },
-  {
-    "id": "mp12",
-    "wordNative": "Masa",
-    "translationFr": "Eau",
-    "icon": "💧"
-  },
-  {
-    "id": "mp13",
-    "wordNative": "Madiya",
-    "translationFr": "Repas",
-    "icon": "🍲"
-  },
-  {
-    "id": "mp14",
-    "wordNative": "Saka-saka",
-    "translationFr": "Feuilles de manioc",
-    "icon": "🥬"
-  },
-  {
-    "id": "mp15",
-    "wordNative": "Kiese",
-    "translationFr": "Joie",
-    "icon": "🎉"
-  },
-  {
-    "id": "mp16",
-    "wordNative": "Nzadi",
-    "translationFr": "Fleuve",
-    "icon": "🌊"
-  }
+  { "id": "mp1", "wordNative": "Mbote", "translationFr": "Bonjour", "icon": "👋" },
+  { "id": "mp2", "wordNative": "Mbuta", "translationFr": "Aîné / Sage", "icon": "👵" },
+  { "id": "mp3", "wordNative": "Mama", "translationFr": "Maman", "icon": "👩" },
+  { "id": "mp4", "wordNative": "Tata", "translationFr": "Papa", "icon": "👨" },
+  { "id": "mp5", "wordNative": "Mwana", "translationFr": "Enfant", "icon": "👶" },
+  { "id": "mp6", "wordNative": "Ntondele", "translationFr": "Merci", "icon": "🙏" },
+  { "id": "mp7", "wordNative": "Nzo", "translationFr": "Maison", "icon": "🏡" },
+  { "id": "mp8", "wordNative": "Nitu", "translationFr": "Corps humain", "icon": "🏃" },
+  { "id": "mp9", "wordNative": "Ntima", "translationFr": "Cœur", "icon": "❤️" },
+  { "id": "mp10", "wordNative": "Nkosi", "translationFr": "Lion", "icon": "🦁" },
+  { "id": "mp11", "wordNative": "Ngo", "translationFr": "Léopard", "icon": "🐆" },
+  { "id": "mp12", "wordNative": "Masa", "translationFr": "Eau", "icon": "💧" },
+  { "id": "mp13", "wordNative": "Madiya", "translationFr": "Repas", "icon": "🍲" },
+  { "id": "mp14", "wordNative": "Saka-saka", "translationFr": "Feuilles de manioc", "icon": "🥬" },
+  { "id": "mp15", "wordNative": "Maboke", "translationFr": "Poisson papillote", "icon": "🐟" },
+  { "id": "mp16", "wordNative": "Kikwanga", "translationFr": "Chikwangue", "icon": "🥖" },
+  { "id": "mp17", "wordNative": "Nsafu", "translationFr": "Safou / Prune", "icon": "🫐" },
+  { "id": "mp18", "wordNative": "Makemba", "translationFr": "Bananes plantains", "icon": "🍌" },
+  { "id": "mp19", "wordNative": "Nkondo", "translationFr": "Baobab sacré", "icon": "🌳" },
+  { "id": "mp20", "wordNative": "Nzadi", "translationFr": "Fleuve Congo", "icon": "🌊" },
+  { "id": "mp21", "wordNative": "Ngoma", "translationFr": "Tam-tam", "icon": "🪘" },
+  { "id": "mp22", "wordNative": "Nlongi", "translationFr": "Enseignant", "icon": "👨‍🏫" },
+  { "id": "mp23", "wordNative": "Mukumbi", "translationFr": "Forgeron", "icon": "🔨" },
+  { "id": "mp24", "wordNative": "Mufubi", "translationFr": "Pêcheur", "icon": "🎣" },
+  { "id": "mp25", "wordNative": "Kiese", "translationFr": "Grande Joie", "icon": "🎉" },
+  { "id": "mp26", "wordNative": "Ngemba", "translationFr": "Paix", "icon": "🕊️" },
+  { "id": "mp27", "wordNative": "Zola", "translationFr": "Amour", "icon": "💖" },
+  { "id": "mp28", "wordNative": "Mosi", "translationFr": "Un (1)", "icon": "1️⃣" },
+  { "id": "mp29", "wordNative": "Zole", "translationFr": "Deux (2)", "icon": "2️⃣" },
+  { "id": "mp30", "wordNative": "Tatu", "translationFr": "Trois (3)", "icon": "3️⃣" }
 ];
 
 export const KOKO_LISTEN_QUESTIONS: ListenQuestion[] = [
@@ -9500,242 +9443,142 @@ export const KOKO_LISTEN_QUESTIONS: ListenQuestion[] = [
     "audioPhrase": "Mbote",
     "promptFr": "Écoute la voix de Koko et sélectionne la bonne image :",
     "options": [
-      {
-        "id": "op1",
-        "translationFr": "Bonjour (Mbote)",
-        "icon": "👋",
-        "isCorrect": true
-      },
-      {
-        "id": "op2",
-        "translationFr": "Maison (Nzo)",
-        "icon": "🏡",
-        "isCorrect": false
-      },
-      {
-        "id": "op3",
-        "translationFr": "Lion (Nkosi)",
-        "icon": "🦁",
-        "isCorrect": false
-      },
-      {
-        "id": "op4",
-        "translationFr": "Eau (Masa)",
-        "icon": "💧",
-        "isCorrect": false
-      }
+      { "id": "op1", "translationFr": "Bonjour (Mbote)", "icon": "👋", "isCorrect": true },
+      { "id": "op2", "translationFr": "Maison (Nzo)", "icon": "🏡", "isCorrect": false },
+      { "id": "op3", "translationFr": "Lion (Nkosi)", "icon": "🦁", "isCorrect": false },
+      { "id": "op4", "translationFr": "Eau (Masa)", "icon": "💧", "isCorrect": false }
     ]
   },
   {
     "id": "lq2",
-    "wordNative": "Mbuta",
-    "audioPhrase": "Mbuta",
-    "promptFr": "Qui Koko nomme-t-il avec grand respect ?",
+    "wordNative": "Sakasaka",
+    "audioPhrase": "Saka-saka",
+    "promptFr": "Quel plat traditionnel congolais Koko est-il en train de savourer ?",
     "options": [
-      {
-        "id": "op1",
-        "translationFr": "Enfant (Mwana)",
-        "icon": "👶",
-        "isCorrect": false
-      },
-      {
-        "id": "op2",
-        "translationFr": "Aîné / Sage (Mbuta)",
-        "icon": "👵",
-        "isCorrect": true
-      },
-      {
-        "id": "op3",
-        "translationFr": "Maman (Mama)",
-        "icon": "👩",
-        "isCorrect": false
-      },
-      {
-        "id": "op4",
-        "translationFr": "Deux (Zole)",
-        "icon": "✌️",
-        "isCorrect": false
-      }
+      { "id": "op1", "translationFr": "Saka-saka (Feuilles de manioc)", "icon": "🥬", "isCorrect": true },
+      { "id": "op2", "translationFr": "Poisson papillote (Maboke)", "icon": "🐟", "isCorrect": false },
+      { "id": "op3", "translationFr": "Maison (Nzo)", "icon": "🏡", "isCorrect": false },
+      { "id": "op4", "translationFr": "Tam-tam (Ngoma)", "icon": "🪘", "isCorrect": false }
     ]
   },
   {
     "id": "lq3",
-    "wordNative": "Nitu",
-    "audioPhrase": "Nitu",
-    "promptFr": "Écoute bien la prononciation et sélectionne le mot correspondant :",
+    "wordNative": "Maboke",
+    "audioPhrase": "Maboke",
+    "promptFr": "De quelle cuisson traditionnelle de poisson Koko parle-t-il ?",
     "options": [
-      {
-        "id": "op1",
-        "translationFr": "Corps humain / Santé (Nitu)",
-        "icon": "🏃",
-        "isCorrect": true
-      },
-      {
-        "id": "op2",
-        "translationFr": "Arbre (Muti)",
-        "icon": "🌳",
-        "isCorrect": false
-      },
-      {
-        "id": "op3",
-        "translationFr": "Lion (Nkosi)",
-        "icon": "🦁",
-        "isCorrect": false
-      },
-      {
-        "id": "op4",
-        "translationFr": "Un (Mosi)",
-        "icon": "1️⃣",
-        "isCorrect": false
-      }
+      { "id": "op1", "translationFr": "Poisson papillote (Maboke)", "icon": "🐟", "isCorrect": true },
+      { "id": "op2", "translationFr": "Bananes (Makemba)", "icon": "🍌", "isCorrect": false },
+      { "id": "op3", "translationFr": "Lion (Nkosi)", "icon": "🦁", "isCorrect": false },
+      { "id": "op4", "translationFr": "Yeux (Meso)", "icon": "👀", "isCorrect": false }
     ]
   },
   {
     "id": "lq4",
-    "wordNative": "Ntima",
-    "audioPhrase": "Ntima",
-    "promptFr": "De quelle partie essentielle du corps Koko parle-t-il ?",
+    "wordNative": "Nkondo",
+    "audioPhrase": "Nkondo",
+    "promptFr": "Quel arbre sacré colossal Koko montre-t-il du doigt ?",
     "options": [
-      {
-        "id": "op1",
-        "translationFr": "Yeux (Meso)",
-        "icon": "👀",
-        "isCorrect": false
-      },
-      {
-        "id": "op2",
-        "translationFr": "Cœur (Ntima)",
-        "icon": "❤️",
-        "isCorrect": true
-      },
-      {
-        "id": "op3",
-        "translationFr": "Mains (Moko)",
-        "icon": "🖐️",
-        "isCorrect": false
-      },
-      {
-        "id": "op4",
-        "translationFr": "Maison (Nzo)",
-        "icon": "🏡",
-        "isCorrect": false
-      }
+      { "id": "op1", "translationFr": "Baobab sacré (Nkondo)", "icon": "🌳", "isCorrect": true },
+      { "id": "op2", "translationFr": "Eau fraîche (Masa)", "icon": "💧", "isCorrect": false },
+      { "id": "op3", "translationFr": "Maman (Mama)", "icon": "👩", "isCorrect": false },
+      { "id": "op4", "translationFr": "Pied (Kulu)", "icon": "🦶", "isCorrect": false }
     ]
   },
   {
     "id": "lq5",
+    "wordNative": "Mbuta",
+    "audioPhrase": "Mbuta",
+    "promptFr": "Qui Koko nomme-t-il avec grand respect ?",
+    "options": [
+      { "id": "op1", "translationFr": "Enfant (Mwana)", "icon": "👶", "isCorrect": false },
+      { "id": "op2", "translationFr": "Aîné / Sage (Mbuta)", "icon": "👵", "isCorrect": true },
+      { "id": "op3", "translationFr": "Maman (Mama)", "icon": "👩", "isCorrect": false },
+      { "id": "op4", "translationFr": "Deux (Zole)", "icon": "✌️", "isCorrect": false }
+    ]
+  },
+  {
+    "id": "lq6",
+    "wordNative": "Ntima",
+    "audioPhrase": "Ntima",
+    "promptFr": "De quelle partie essentielle du corps Koko parle-t-il ?",
+    "options": [
+      { "id": "op1", "translationFr": "Yeux (Meso)", "icon": "👀", "isCorrect": false },
+      { "id": "op2", "translationFr": "Cœur (Ntima)", "icon": "❤️", "isCorrect": true },
+      { "id": "op3", "translationFr": "Mains (Moko)", "icon": "🖐️", "isCorrect": false },
+      { "id": "op4", "translationFr": "Maison (Nzo)", "icon": "🏡", "isCorrect": false }
+    ]
+  },
+  {
+    "id": "lq7",
     "wordNative": "Ntondele",
     "audioPhrase": "Ntondele",
     "promptFr": "Quel mot de gratitude et de remerciement Koko prononce-t-il ?",
     "options": [
-      {
-        "id": "op1",
-        "translationFr": "Maison (Nzo)",
-        "icon": "🏡",
-        "isCorrect": false
-      },
-      {
-        "id": "op2",
-        "translationFr": "Merci (Ntondele)",
-        "icon": "🙏",
-        "isCorrect": true
-      },
-      {
-        "id": "op3",
-        "translationFr": "Lion (Nkosi)",
-        "icon": "🦁",
-        "isCorrect": false
-      },
-      {
-        "id": "op4",
-        "translationFr": "Un (Mosi)",
-        "icon": "1️⃣",
-        "isCorrect": false
-      }
+      { "id": "op1", "translationFr": "Maison (Nzo)", "icon": "🏡", "isCorrect": false },
+      { "id": "op2", "translationFr": "Merci (Ntondele)", "icon": "🙏", "isCorrect": true },
+      { "id": "op3", "translationFr": "Lion (Nkosi)", "icon": "🦁", "isCorrect": false },
+      { "id": "op4", "translationFr": "Un (Mosi)", "icon": "1️⃣", "isCorrect": false }
+    ]
+  },
+  {
+    "id": "lq8",
+    "wordNative": "Ngoma",
+    "audioPhrase": "Ngoma",
+    "promptFr": "Quel instrument traditionnel fait résonner ses rythmes ?",
+    "options": [
+      { "id": "op1", "translationFr": "Tam-tam (Ngoma)", "icon": "🪘", "isCorrect": true },
+      { "id": "op2", "translationFr": "Eau (Masa)", "icon": "💧", "isCorrect": false },
+      { "id": "op3", "translationFr": "Plein air (Mfinda)", "icon": "🌲", "isCorrect": false },
+      { "id": "op4", "translationFr": "Feu (Tiya)", "icon": "🔥", "isCorrect": false }
+    ]
+  },
+  {
+    "id": "lq9",
+    "wordNative": "Kiese",
+    "audioPhrase": "Kiese",
+    "promptFr": "Quel sentiment d'allégresse et de bonheur Koko exprime-t-il ?",
+    "options": [
+      { "id": "op1", "translationFr": "Joie immense (Kiese)", "icon": "🎉", "isCorrect": true },
+      { "id": "op2", "translationFr": "Corps (Nitu)", "icon": "🏃", "isCorrect": false },
+      { "id": "op3", "translationFr": "Maison (Nzo)", "icon": "🏡", "isCorrect": false },
+      { "id": "op4", "translationFr": "Lion (Nkosi)", "icon": "🦁", "isCorrect": false }
+    ]
+  },
+  {
+    "id": "lq10",
+    "wordNative": "Nzadi",
+    "audioPhrase": "Nzadi",
+    "promptFr": "Quel grand cours d'eau majestueux Koko contemple-t-il ?",
+    "options": [
+      { "id": "op1", "translationFr": "Fleuve Congo (Nzadi)", "icon": "🌊", "isCorrect": true },
+      { "id": "op2", "translationFr": "Feuilles (Saka-saka)", "icon": "🥬", "isCorrect": false },
+      { "id": "op3", "translationFr": "Arbre (Nkondo)", "icon": "🌳", "isCorrect": false },
+      { "id": "op4", "translationFr": "Papa (Tata)", "icon": "👨", "isCorrect": false }
     ]
   }
 ];
 
 export const KOKO_WORD_PUZZLES: WordPuzzleItem[] = [
-  {
-    "id": "wp1",
-    "wordNative": "MBOTE",
-    "translationFr": "Bonjour",
-    "icon": "👋",
-    "syllables": [
-      "MBO",
-      "TE"
-    ]
-  },
-  {
-    "id": "wp2",
-    "wordNative": "MBUTA",
-    "translationFr": "Aîné / Sage",
-    "icon": "👵",
-    "syllables": [
-      "MBU",
-      "TA"
-    ]
-  },
-  {
-    "id": "wp3",
-    "wordNative": "MWANA",
-    "translationFr": "Enfant",
-    "icon": "👶",
-    "syllables": [
-      "MWA",
-      "NA"
-    ]
-  },
-  {
-    "id": "wp4",
-    "wordNative": "NITU",
-    "translationFr": "Corps humain",
-    "icon": "🏃",
-    "syllables": [
-      "NI",
-      "TU"
-    ]
-  },
-  {
-    "id": "wp5",
-    "wordNative": "NTIMA",
-    "translationFr": "Cœur",
-    "icon": "❤️",
-    "syllables": [
-      "NTI",
-      "MA"
-    ]
-  },
-  {
-    "id": "wp6",
-    "wordNative": "MADIYA",
-    "translationFr": "Repas / Nourriture",
-    "icon": "🍲",
-    "syllables": [
-      "MA",
-      "DI",
-      "YA"
-    ]
-  },
-  {
-    "id": "wp7",
-    "wordNative": "MASA",
-    "translationFr": "Eau fraîche",
-    "icon": "💧",
-    "syllables": [
-      "MA",
-      "SA"
-    ]
-  },
-  {
-    "id": "wp8",
-    "wordNative": "NKOSI",
-    "translationFr": "Lion",
-    "icon": "🦁",
-    "syllables": [
-      "NKO",
-      "SI"
-    ]
-  }
+  { "id": "wp1", "wordNative": "MBOTE", "translationFr": "Bonjour", "icon": "👋", "syllables": ["MBO", "TE"] },
+  { "id": "wp2", "wordNative": "MBUTA", "translationFr": "Aîné / Sage", "icon": "👵", "syllables": ["MBU", "TA"] },
+  { "id": "wp3", "wordNative": "MWANA", "translationFr": "Enfant", "icon": "👶", "syllables": ["MWA", "NA"] },
+  { "id": "wp4", "wordNative": "NITU", "translationFr": "Corps humain", "icon": "🏃", "syllables": ["NI", "TU"] },
+  { "id": "wp5", "wordNative": "NTIMA", "translationFr": "Cœur", "icon": "❤️", "syllables": ["NTI", "MA"] },
+  { "id": "wp6", "wordNative": "MADIYA", "translationFr": "Repas / Nourriture", "icon": "🍲", "syllables": ["MA", "DI", "YA"] },
+  { "id": "wp7", "wordNative": "MASA", "translationFr": "Eau fraîche", "icon": "💧", "syllables": ["MA", "SA"] },
+  { "id": "wp8", "wordNative": "NKOSI", "translationFr": "Lion", "icon": "🦁", "syllables": ["NKO", "SI"] },
+  { "id": "wp9", "wordNative": "SAKASAKA", "translationFr": "Feuilles de manioc", "icon": "🥬", "syllables": ["SA", "KA", "SA", "KA"] },
+  { "id": "wp10", "wordNative": "MABOKE", "translationFr": "Poisson en papillote", "icon": "🐟", "syllables": ["MA", "BO", "KE"] },
+  { "id": "wp11", "wordNative": "KIKWANGA", "translationFr": "Chikwangue du Pool", "icon": "🥖", "syllables": ["KI", "KWA", "NGA"] },
+  { "id": "wp12", "wordNative": "NKONDO", "translationFr": "Baobab sacré", "icon": "🌳", "syllables": ["NKO", "NDO"] },
+  { "id": "wp13", "wordNative": "NGOMA", "translationFr": "Tam-tam de danse", "icon": "🪘", "syllables": ["NGO", "MA"] },
+  { "id": "wp14", "wordNative": "NZADI", "translationFr": "Grand Fleuve", "icon": "🌊", "syllables": ["NZA", "DI"] },
+  { "id": "wp15", "wordNative": "KIESE", "translationFr": "Grande Joie", "icon": "🎉", "syllables": ["KIE", "SE"] },
+  { "id": "wp16", "wordNative": "NGEMBA", "translationFr": "Paix & Concorde", "icon": "🕊️", "syllables": ["NGE", "MBA"] },
+  { "id": "wp17", "wordNative": "NLONGI", "translationFr": "Enseignant", "icon": "👨‍🏫", "syllables": ["NLO", "NGI"] },
+  { "id": "wp18", "wordNative": "MUKUMBI", "translationFr": "Forgeron d'art", "icon": "🔨", "syllables": ["MU", "KU", "MBI"] },
+  { "id": "wp19", "wordNative": "MATSOUA", "translationFr": "André Matsoua", "icon": "👑", "syllables": ["MA", "TSO", "UA"] },
+  { "id": "wp20", "wordNative": "NTONDELE", "translationFr": "Merci de tout cœur", "icon": "🙏", "syllables": ["NTO", "NDE", "LE"] }
 ];
+

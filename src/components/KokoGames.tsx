@@ -50,7 +50,9 @@ export const KokoGames: React.FC<KokoGamesProps> = ({ onEarnXp, onBackToDashboar
 
   // Initialize Match Pairs Game
   const initMatchGame = () => {
-    const selectedPairs = KOKO_MATCH_PAIRS.slice(0, 4); // 4 pairs (8 cards)
+    // Pick 6 random pairs from the 30 available pairs for a rich 12-card board
+    const shuffledPairs = [...KOKO_MATCH_PAIRS].sort(() => Math.random() - 0.5);
+    const selectedPairs = shuffledPairs.slice(0, 6);
     const cardDeck: CardItem[] = [];
     selectedPairs.forEach((pair) => {
       cardDeck.push({
@@ -157,8 +159,8 @@ export const KokoGames: React.FC<KokoGamesProps> = ({ onEarnXp, onBackToDashboar
           setEarnedXpTotal((prev) => prev + xp);
           if (onEarnXp) onEarnXp(xp);
 
-          if (newCount === 4) {
-            // All pairs matched!
+          if (newCount === 6) {
+            // All 6 pairs matched!
             setTimeout(() => {
               playVictoryFanfare();
               setShowCelebration(true);
@@ -482,12 +484,12 @@ export const KokoGames: React.FC<KokoGamesProps> = ({ onEarnXp, onBackToDashboar
               </div>
             </div>
             <div className="text-xs font-bold text-purple-900 bg-purple-100 px-3 py-1 rounded-full border border-purple-300">
-              Paires : {matchedPairsCount} / 4
+              Paires : {matchedPairsCount} / 6
             </div>
           </div>
 
           {/* Cards Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-3">
             {cards.map((card) => {
               const isSelected = selectedCards.some((c) => c.uid === card.uid);
               let cardStyle = 'bg-white border-purple-200 hover:border-purple-400 hover:shadow-md cursor-pointer';
@@ -501,7 +503,7 @@ export const KokoGames: React.FC<KokoGamesProps> = ({ onEarnXp, onBackToDashboar
                 <div
                   key={card.uid}
                   onClick={() => handleCardClick(card)}
-                  className={`h-28 rounded-2xl border-2 p-3 flex flex-col items-center justify-center text-center transition-all ${cardStyle}`}
+                  className={`h-24 sm:h-28 rounded-2xl border-2 p-2.5 sm:p-3 flex flex-col items-center justify-center text-center transition-all ${cardStyle}`}
                 >
                   <div className="text-2xl sm:text-3xl mb-1">{card.icon}</div>
                   <div className="font-extrabold text-sm sm:text-base text-savanna-900 leading-tight">
@@ -521,10 +523,10 @@ export const KokoGames: React.FC<KokoGamesProps> = ({ onEarnXp, onBackToDashboar
               className="flex items-center gap-1.5 text-xs font-bold text-purple-800 bg-purple-50 hover:bg-purple-100 px-3 py-2 rounded-xl border border-purple-200"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Mélanger à nouveau</span>
+              <span>Mélanger d'autres mots</span>
             </button>
             <span className="text-xs text-savanna-700 font-medium">
-              Trouve les 4 paires pour remporter +60 XP !
+              Trouve les 6 paires pour remporter +90 XP !
             </span>
           </div>
         </div>
