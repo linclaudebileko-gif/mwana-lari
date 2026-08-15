@@ -2,16 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { FAMILY_CHALLENGES } from '../data/mockData';
 import { parentsAPI } from '../services/api';
-import { Users, Trophy, Mic, CheckCircle2, Heart, Award, Sparkles, Plus, RefreshCw } from 'lucide-react';
+import { Users, Trophy, Mic, CheckCircle2, Heart, Award, Sparkles, Plus, RefreshCw, Crown, Zap, Smartphone, CreditCard } from 'lucide-react';
 import { playSuccessChime } from '../utils/audio';
 import { AddChildModal } from './AddChildModal';
+import { SubscriptionModal } from './SubscriptionModal';
 
 export const FamilyChallenges: React.FC = () => {
-  const { user, childrenList, activeChild, setActiveChild, updateActiveChildStats } = useAuth();
+  const { user, childrenList, activeChild, setActiveChild, updateActiveChildStats, isPremium, subscription } = useAuth();
   const [challenges, setChallenges] = useState(FAMILY_CHALLENGES);
   const [isRecordingElder, setIsRecordingElder] = useState(false);
   const [recordedAudioSuccess, setRecordedAudioSuccess] = useState(false);
   const [isAddChildModalOpen, setIsAddChildModalOpen] = useState(false);
+  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [childStats, setChildStats] = useState<Record<string, any>>({});
   const [loadingStats, setLoadingStats] = useState(false);
 
@@ -59,23 +61,23 @@ export const FamilyChallenges: React.FC = () => {
       updateActiveChildStats({
         xpPoints: activeChild.xpPoints + 50,
       });
-    }, 2500);
+    }, 2000);
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-fadeIn max-w-5xl mx-auto">
       
-      {/* Module Banner */}
-      <div className="glass-card-terracotta p-6 rounded-3xl border-2 border-terracotta-400 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Top Banner */}
+      <div className="glass-card-terracotta rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border-2 border-terracotta-300 shadow-xl">
         <div>
           <div className="flex items-center gap-2">
             <Users className="w-7 h-7 text-terracotta-700" />
             <h2 className="font-extrabold text-2xl text-terracotta-950">
-              👨‍👩‍👧 Espace Famille & Défis Familiaux
+              👨‍👩‍👧 Espace Famille & Monétisation Mobile Money
             </h2>
           </div>
           <p className="text-sm text-terracotta-950 font-medium mt-1">
-            Reconnectez les générations ! Lancez des défis en famille et conservez la mémoire orale de vos aînés.
+            Reconnectez les générations ! Gérez les profils de vos enfants, votre abonnement Mobile Money et conservez la mémoire orale de vos aînés.
           </p>
         </div>
 
@@ -94,6 +96,69 @@ export const FamilyChallenges: React.FC = () => {
               {childrenList.length} enfant(s) enregistré(s)
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Subscription & Mobile Money Management Banner */}
+      <div className="glass-card p-6 sm:p-7 rounded-3xl border-3 border-amber-300 shadow-xl bg-gradient-to-r from-amber-50/90 via-orange-50/70 to-white flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-brand-500 flex items-center justify-center text-white shadow-md">
+              <Crown className="w-5 h-5" />
+            </div>
+            <div>
+              <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                isPremium
+                  ? 'bg-forest-100 text-forest-800 border-forest-300'
+                  : 'bg-amber-100 text-amber-900 border-amber-300'
+              }`}>
+                {isPremium ? '👑 Abonnement Actif' : '🟡 Forfait Gratuit (Découverte)'}
+              </span>
+              <h3 className="text-lg sm:text-xl font-black text-savanna-950">
+                {isPremium ? subscription?.planName : 'Passez au Forfait Famille Mwana Lari'}
+              </h3>
+            </div>
+          </div>
+
+          <p className="text-xs sm:text-sm text-savanna-800 font-medium max-w-xl">
+            {isPremium ? (
+              <span>
+                Votre famille bénéficie d'un accès illimité aux <strong>529 mots Lari</strong>, aux 5 niveaux, contes audio des aînés et mini-jeux.
+                {subscription?.expiresAt && ` (Valable jusqu'au ${new Date(subscription.expiresAt).toLocaleDateString('fr-FR')})`}
+              </span>
+            ) : (
+              <span>
+                Abonnez votre famille pour seulement <strong>1 500 FCFA / mois</strong> via <strong>MTN Mobile Money (*105#)</strong> ou <strong>Airtel Money (*128#)</strong>.
+              </span>
+            )}
+          </p>
+
+          <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] font-bold text-savanna-700">
+            <span className="flex items-center gap-1">
+              <Smartphone className="w-3.5 h-3.5 text-amber-600" />
+              <span>MTN MoMo Congo</span>
+            </span>
+            <span>•</span>
+            <span className="flex items-center gap-1">
+              <Smartphone className="w-3.5 h-3.5 text-red-600" />
+              <span>Airtel Money Congo</span>
+            </span>
+            <span>•</span>
+            <span className="flex items-center gap-1">
+              <CreditCard className="w-3.5 h-3.5 text-blue-600" />
+              <span>Visa / Mastercard</span>
+            </span>
+          </div>
+        </div>
+
+        <div className="flex-shrink-0 w-full md:w-auto">
+          <button
+            onClick={() => setIsSubscriptionModalOpen(true)}
+            className="w-full md:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-r from-brand-600 via-amber-500 to-terracotta-600 hover:brightness-110 text-white font-black text-xs sm:text-sm shadow-xl shadow-brand-500/30 flex items-center justify-center gap-2 transform active:scale-95 transition-all"
+          >
+            <Zap className="w-4 h-4 text-amber-200 fill-amber-200" />
+            <span>{isPremium ? 'Gérer / Modifier l\'Abonnement' : 'S\'abonner (1 500 FCFA / mois)'}</span>
+          </button>
         </div>
       </div>
 
@@ -283,6 +348,11 @@ export const FamilyChallenges: React.FC = () => {
       <AddChildModal
         isOpen={isAddChildModalOpen}
         onClose={() => setIsAddChildModalOpen(false)}
+      />
+
+      <SubscriptionModal
+        isOpen={isSubscriptionModalOpen}
+        onClose={() => setIsSubscriptionModalOpen(false)}
       />
 
     </div>

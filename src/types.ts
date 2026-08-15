@@ -119,3 +119,45 @@ export interface WordPuzzleItem {
   syllables: string[];
 }
 
+export type PaymentMethod = 'MTN_MOMO' | 'AIRTEL_MONEY' | 'VISA_MASTERCARD';
+
+export type SubscriptionTier = 'FREE' | 'FAMILY' | 'CLAN_DIASPORA';
+
+export interface PricingPlan {
+  id: string;
+  tier: SubscriptionTier;
+  name: string;
+  tagline: string;
+  priceFcfaMonthly: number;
+  priceFcfaYearly: number;
+  priceEurMonthly: number;
+  priceEurYearly: number;
+  maxChildren: number;
+  features: string[];
+  isPopular?: boolean;
+}
+
+export interface SubscriptionStatus {
+  isPremium: boolean;
+  tier: SubscriptionTier;
+  planName: string;
+  billingCycle: 'monthly' | 'yearly';
+  expiresAt: string;
+  phoneNumber?: string;
+  paymentMethod?: PaymentMethod;
+}
+
+export interface PaymentTransaction {
+  id: string;
+  planId: string;
+  tier: SubscriptionTier;
+  billingCycle: 'monthly' | 'yearly';
+  amountFcfa: number;
+  method: PaymentMethod;
+  phoneNumber: string;
+  countryCode: string;
+  status: 'PENDING' | 'SUCCESS' | 'FAILED';
+  createdAt: string;
+  referenceCode: string;
+}
+

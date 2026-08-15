@@ -9,6 +9,7 @@ from .routers import (
     lessons_router,
     heritage_router,
     validations_router,
+    payments_router,
 )
 from .seed.seed_data import seed_database
 
@@ -46,6 +47,8 @@ app.include_router(words_router, prefix=settings.API_V1_STR)
 app.include_router(lessons_router, prefix=settings.API_V1_STR)
 app.include_router(heritage_router, prefix=settings.API_V1_STR)
 app.include_router(validations_router, prefix=settings.API_V1_STR)
+app.include_router(payments_router, prefix=settings.API_V1_STR)
+
 
 @app.get("/")
 def root():

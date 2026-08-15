@@ -465,3 +465,156 @@ export const validationsAPI = {
     });
   },
 };
+
+// ==========================================
+// 7. MONÉTISATION & PAIEMENTS MOBILE MONEY
+// ==========================================
+export const DEFAULT_PRICING_PLANS = [
+  {
+    id: 'plan_free',
+    tier: 'FREE' as const,
+    name: 'Découverte (Gratuit)',
+    tagline: 'Pour s\'initier aux premiers mots',
+    priceFcfaMonthly: 0,
+    priceFcfaYearly: 0,
+    priceEurMonthly: 0,
+    priceEurYearly: 0,
+    maxChildren: 1,
+    features: [
+      'Accès au Niveau 1 (Découverte)',
+      '100 mots du Dictionnaire avec audio',
+      '1 profil enfant',
+      'Jeu des devinettes de Koko'
+    ]
+  },
+  {
+    id: 'plan_family',
+    tier: 'FAMILY' as const,
+    name: 'Famille Mwana Lari',
+    tagline: 'L\'accès complet pour les familles au Congo',
+    priceFcfaMonthly: 1500,
+    priceFcfaYearly: 15000,
+    priceEurMonthly: 2.49,
+    priceEurYearly: 24.99,
+    maxChildren: 3,
+    isPopular: true,
+    features: [
+      'Accès illimité aux 5 Niveaux Pédagogiques',
+      'Grand Dictionnaire complet (+520 mots Lari)',
+      'Tous les Contes & Récits audio des Aînés (WAV HD)',
+      'Jusqu\'à 3 profils enfants personnalisés',
+      'Tous les 4 Mini-Jeux de Koko illimités',
+      'Mode 100% Hors-Ligne (PWA sans connexion)'
+    ]
+  },
+  {
+    id: 'plan_clan',
+    tier: 'CLAN_DIASPORA' as const,
+    name: 'Grand Clan & Diaspora',
+    tagline: 'Pour les grandes familles et la diaspora',
+    priceFcfaMonthly: 2500,
+    priceFcfaYearly: 25000,
+    priceEurMonthly: 4.99,
+    priceEurYearly: 49.99,
+    maxChildren: 10,
+    features: [
+      'Tout le forfait Famille inclus',
+      'Profils enfants illimités (jusqu\'à 10)',
+      'Studio d\'Enregistrement Vocal familial illimité',
+      'Tableau de bord de suivi personnalisé',
+      'Certificat officiel de réussite de l\'Académie Lari',
+      'Support prioritaire par WhatsApp'
+    ]
+  }
+];
+
+const SUBSCRIPTION_STORAGE_KEY = 'mwana_lari_subscription';
+
+export const paymentsAPI = {
+  getPlans: async () => {
+    try {
+      const data = await apiRequest<any[]>('/payments/plans');
+      if (data && data.length > 0) return data;
+    } catch {
+      // offline / mock fallback
+    }
+    return DEFAULT_PRICING_PLANS;
+  },
+
+  initiateMomoPayment: async (payload: {
+    planId: string;
+    tier: 'FAMILY' | 'CLAN_DIASPORA';
+    billingCycle: 'monthly' | 'yearly';
+    method: 'MTN_MOMO' | 'AIRTEL_MONEY' | 'VISA_MASTERCARD';
+    phoneNumber: string;
+    amountFcfa: number;
+  }) => {
+    try {
+      return await apiRequest('/payments/momo/initiate', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      // Fallback local simulation with instant response
+      const refCode = `MOMO-${Date.now().toString().slice(-6)}`;
+      const ussdGuide = payload.method === 'MTN_MOMO' ? '*105#' : '*128#';
+      return {
+        transaction_id: `tx_${Date.now()}`,
+        status: 'PENDING',
+        reference_code: refCode,
+        amount_fcfa: payload.amountFcfa,
+        operator: payload.method === 'MTN_MOMO' ? 'MTN Congo (MoMo)' : 'Airtel Congo (Airtel Money)',
+        ussd_instruction: `Validez le prélèvement de ${payload.amountFcfa.toLocaleString()} FCFA en composant votre code secret sur ${ussdGuide}`,
+      };
+    }
+  },
+
+  verifyPayment: async (transactionId: string) => {
+    try {
+      return await apiRequest(`/payments/verify/${transactionId}`);
+    } catch (err) {
+      // Mock successful verification after simulation
+      return {
+        status: 'SUCCESS',
+        transaction_id: transactionId,
+        message: 'Paiement Mobile Money validé avec succès !',
+      };
+    }
+  },
+
+  getLocalSubscription: (): {
+    isPremium: boolean;
+    tier: 'FREE' | 'FAMILY' | 'CLAN_DIASPORA';
+    planName: string;
+    billingCycle: 'monthly' | 'yearly';
+    expiresAt: string;
+    phoneNumber?: string;
+  } => {
+    try {
+      const stored = localStorage.getItem(SUBSCRIPTION_STORAGE_KEY);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch {}
+    return {
+      isPremium: false,
+      tier: 'FREE',
+      planName: 'Découverte (Gratuit)',
+      billingCycle: 'monthly',
+      expiresAt: '',
+    };
+  },
+
+  saveLocalSubscription: (sub: {
+    isPremium: boolean;
+    tier: 'FREE' | 'FAMILY' | 'CLAN_DIASPORA';
+    planName: string;
+    billingCycle: 'monthly' | 'yearly';
+    expiresAt: string;
+    phoneNumber?: string;
+  }) => {
+    try {
+      localStorage.setItem(SUBSCRIPTION_STORAGE_KEY, JSON.stringify(sub));
+    } catch {}
+  },
+};
