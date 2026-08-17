@@ -128,9 +128,9 @@ Si le serveur Cloud est momentanément en maintenance ou que l'utilisateur est d
 
 ## 🛡️ Comptes de Démonstration Inclus dans la Base en Ligne
 
-| Rôle | Email | Mot de passe | Permissions |
+| Rôle | Email | Mode d'accès | Permissions |
 | :--- | :--- | :--- | :--- |
-| 👑 **Administrateur** | `admin@mwanalari.cg` | `REDACTED_PASSWORD` | Gestion globale, statistiques & validation |
-| 👵 **Linguiste MBUTA** | `linguiste@mwanalari.cg` | `REDACTED_PASSWORD` | Validation des sons vocaux & enrichissement |
-| 👨‍👩‍👧 **Parent d'élève** | `parent@mwanalari.cg` | `REDACTED_PASSWORD` | Espace Famille, Enfants & Abonnements MoMo |
-| 👨‍🏫 **Enseignant** | `enseignant@mwanalari.cg` | `REDACTED_PASSWORD` | Suivi de classe & devoirs |
+| 👑 **Administrateur** | `admin@mwanalari.cg` | Connexion 1-clic Démo ou mot de passe configuré via `DEFAULT_ADMIN_PASSWORD` | Gestion globale, statistiques & validation |
+| 👵 **Linguiste MBUTA** | `linguiste@mwanalari.cg` | Connexion 1-clic Démo | Validation des sons vocaux & enrichissement |
+| 👨‍👩‍👧 **Parent d'élève** | `parent@mwanalari.cg` | Connexion 1-clic Démo | Espace Famille, Enfants & Abonnements MoMo |
+| 👨‍🏫 **Enseignant** | `enseignant@mwanalari.cg` | Connexion 1-clic Démo | Suivi de classe & devoirs |

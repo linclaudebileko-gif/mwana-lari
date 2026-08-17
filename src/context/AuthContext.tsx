@@ -40,13 +40,6 @@ interface AuthContextType {
   }) => Promise<void>;
 }
 
-const DEMO_ACCOUNTS = {
-  parent: { email: 'parent@mwanalari.cg', password: 'REDACTED_PASSWORD' },
-  teacher: { email: 'enseignant@mwanalari.cg', password: 'REDACTED_PASSWORD' },
-  linguist: { email: 'linguiste@mwanalari.cg', password: 'REDACTED_PASSWORD' },
-  admin: { email: 'admin@mwanalari.cg', password: 'REDACTED_PASSWORD' },
-};
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -149,13 +142,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const loginAsDemo = async (demoType: 'parent' | 'teacher' | 'linguist' | 'admin') => {
-    const creds = DEMO_ACCOUNTS[demoType];
-    await login(creds.email, credds(demoType));
-  };
-
-  // Helper demo password
-  const credds = (type: string) => {
-    return 'REDACTED_PASSWORD';
+    setIsLoading(true);
+    try {
+      const session = await authAPI.demoLogin(demoType);
+      setUser(session);
+      if (session.role === 'PARENT') {
+        await refreshChildren();
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const setActiveChild = (child: ChildProfile) => {

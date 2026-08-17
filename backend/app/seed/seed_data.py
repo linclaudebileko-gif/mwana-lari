@@ -29,30 +29,35 @@ def seed_database():
         # 2. Seed Users
         admin_user = db.query(User).filter(User.email == "admin@mwanalari.cg").first()
         if not admin_user:
+            import os
+            import secrets
+            default_demo_pwd = os.getenv("DEMO_USERS_PASSWORD") or secrets.token_urlsafe(16)
+            admin_pwd = os.getenv("DEFAULT_ADMIN_PASSWORD") or default_demo_pwd
+
             admin_user = User(
                 email="admin@mwanalari.cg",
-                password_hash=get_password_hash("REDACTED_PASSWORD"),
+                password_hash=get_password_hash(admin_pwd),
                 full_name="Professeur Massamba (Linguiste en Chef)",
                 role="ADMIN",
                 country_code="CG"
             )
             linguist_user = User(
                 email="linguiste@mwanalari.cg",
-                password_hash=get_password_hash("REDACTED_PASSWORD"),
+                password_hash=get_password_hash(default_demo_pwd),
                 full_name="Mamma Pauline (Comite Linguistique Lari)",
                 role="LINGUIST",
                 country_code="CG"
             )
             parent_user = User(
                 email="parent@mwanalari.cg",
-                password_hash=get_password_hash("REDACTED_PASSWORD"),
+                password_hash=get_password_hash(default_demo_pwd),
                 full_name="Mavoungou Jean (Parent)",
                 role="PARENT",
                 country_code="CG"
             )
             teacher_user = User(
                 email="enseignant@mwanalari.cg",
-                password_hash=get_password_hash("REDACTED_PASSWORD"),
+                password_hash=get_password_hash(default_demo_pwd),
                 full_name="Maitre Clarisse (Ecole de Bacongo)",
                 role="TEACHER",
                 country_code="CG"

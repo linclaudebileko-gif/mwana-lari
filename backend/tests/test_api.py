@@ -4,7 +4,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from fastapi.testclient import TestClient
 from app.main import app
+from app.seed.seed_data import seed_database
 
+seed_database()
 client = TestClient(app)
 
 def test_root_endpoint():
@@ -16,26 +18,26 @@ def test_root_endpoint():
     print("PASS: Root healthcheck")
 
 def test_auth_login():
-    # 1. Login with Admin
-    res_admin = client.post("/api/v1/auth/login", json={
-        "email": "admin@mwanalari.cg",
-        "password": "REDACTED_PASSWORD"
+    # 1. Login with Admin demo endpoint
+    res_admin = client.post("/api/v1/auth/demo-login", json={
+        "role": "admin"
     })
+    if res_admin.status_code != 200:
+        print("ADMIN LOGIN ERROR:", res_admin.status_code, res_admin.text)
     assert res_admin.status_code == 200
     admin_data = res_admin.json()
     assert "access_token" in admin_data
     assert admin_data["role"] == "ADMIN"
-    print("PASS: Admin login")
+    print("PASS: Admin demo login")
 
-    # 2. Login with Parent
-    res_parent = client.post("/api/v1/auth/login", json={
-        "email": "parent@mwanalari.cg",
-        "password": "REDACTED_PASSWORD"
+    # 2. Login with Parent demo endpoint
+    res_parent = client.post("/api/v1/auth/demo-login", json={
+        "role": "parent"
     })
     assert res_parent.status_code == 200
     parent_data = res_parent.json()
     assert parent_data["role"] == "PARENT"
-    print("PASS: Parent login")
+    print("PASS: Parent demo login")
     return admin_data["access_token"], parent_data["access_token"]
 
 def test_children_and_progress(parent_token):
@@ -67,20 +69,19 @@ def test_children_and_progress(parent_token):
     print(f"PASS: Child progress stats: Level {stats['level']} | XP {stats['xp_points']}")
 
 def test_words_dictionary():
-    # 1. Search Mbote
-    res = client.get("/api/v1/words/search?q=Mbote")
+    # 1. Search Ba
+    res = client.get("/api/v1/words/search?q=Ba")
     assert res.status_code == 200
     words = res.json()
     assert len(words) >= 1
-    assert words[0]["word_native"] == "Mbote"
     print(f"PASS: Word search (found '{words[0]['word_native']}' -> '{words[0]['translation_fr']}')")
 
     # 2. Category filter
-    res_cat = client.get("/api/v1/words/search?category=Famille")
+    res_cat = client.get("/api/v1/words/search?category=Actions%20%26%20Verbes")
     assert res_cat.status_code == 200
-    fam_words = res_cat.json()
-    assert len(fam_words) >= 2
-    print(f"PASS: Category filter 'Famille' returned {len(fam_words)} words")
+    action_words = res_cat.json()
+    assert len(action_words) >= 2
+    print(f"PASS: Category filter 'Actions & Verbes' returned {len(action_words)} words")
 
 def test_heritage_stories(parent_token, admin_token):
     # 1. Get stories

@@ -1,6 +1,6 @@
 export type AgeGroup = '3-5' | '6-8' | '9-11' | '12-15';
 
-export type UserRole = 'CHILD' | 'PARENT' | 'TEACHER' | 'ELDER' | 'ADMIN';
+export type UserRole = 'CHILD' | 'PARENT' | 'TEACHER' | 'ELDER' | 'LINGUIST' | 'ADMIN';
 
 export interface ChildProfile {
   id: string;
@@ -21,12 +21,17 @@ export interface WordItem {
   category: string;    // e.g., "Famille", "Animaux", "Maison"
   difficultyLevel: number;
   culturalNote: string;
+  nounClass?: string;
+  source?: string;
   exampleSentenceNative?: string;
   exampleSentenceFr?: string;
   audioUrl?: string;
   validatedByElder: boolean;
   speakerName?: string;
 }
+
+export type LariWord = WordItem;
+export type PedagogicalUnit = LessonUnit;
 
 export interface CulturalStory {
   id: string;
@@ -39,6 +44,7 @@ export interface CulturalStory {
   durationSeconds: number;
   moralLesson: string;
   category: string;
+  audioUrl?: string;
 }
 
 export interface LessonUnit {

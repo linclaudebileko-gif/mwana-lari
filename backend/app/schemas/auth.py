@@ -14,6 +14,9 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class DemoLoginRequest(BaseModel):
+    role: str  # 'parent', 'teacher', 'linguist', 'admin'
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"

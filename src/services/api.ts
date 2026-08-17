@@ -157,7 +157,7 @@ export const authAPI = {
     return session;
   },
 
-  register: async (payload: RegisterPayload): Promise<UserSession> => {
+  register: async (payload: RegisterPayload, initialChildName?: string): Promise<UserSession> => {
     const res = await apiRequest<{
       access_token: string;
       token_type: string;
@@ -187,6 +187,51 @@ export const authAPI = {
 
     setStoredSession(session);
     return session;
+  },
+
+  demoLogin: async (role: 'parent' | 'teacher' | 'linguist' | 'admin'): Promise<UserSession> => {
+    try {
+      const res = await apiRequest<{
+        access_token: string;
+        token_type: string;
+        user_id: string;
+        email: string;
+        role: UserRole;
+        full_name: string;
+      }>('/auth/demo-login', {
+        method: 'POST',
+        body: JSON.stringify({ role }),
+      });
+
+      const session: UserSession = {
+        id: res.user_id,
+        email: res.email,
+        role: res.role,
+        fullName: res.full_name,
+        token: res.access_token,
+      };
+
+      setStoredSession(session);
+      return session;
+    } catch {
+      // Fallback offline session for standalone demo without hardcoded passwords
+      const demoRoleMap: Record<string, { role: UserRole; email: string; fullName: string }> = {
+        parent: { role: 'PARENT', email: 'parent@mwanalari.cg', fullName: 'Mavoungou Jean (Parent)' },
+        teacher: { role: 'TEACHER', email: 'enseignant@mwanalari.cg', fullName: 'Maitre Clarisse (Enseignant)' },
+        linguist: { role: 'LINGUIST', email: 'linguiste@mwanalari.cg', fullName: 'Mamma Pauline (Linguiste)' },
+        admin: { role: 'ADMIN', email: 'admin@mwanalari.cg', fullName: 'Prof. Massamba (Admin)' },
+      };
+      const info = demoRoleMap[role] || demoRoleMap.parent;
+      const fallbackSession: UserSession = {
+        id: `demo_${role}_offline`,
+        email: info.email,
+        role: info.role,
+        fullName: info.fullName,
+        token: `demo_token_${Date.now()}`,
+      };
+      setStoredSession(fallbackSession);
+      return fallbackSession;
+    }
   },
 
   getMe: async (): Promise<any> => {
@@ -500,7 +545,7 @@ export const DEFAULT_PRICING_PLANS = [
     isPopular: true,
     features: [
       'Accès illimité aux 5 Niveaux Pédagogiques',
-      'Grand Dictionnaire complet (+520 mots Lari)',
+      'Grand Dictionnaire complet (+2600 mots Lari authentiques)',
       'Tous les Contes & Récits audio des Aînés (WAV HD)',
       'Jusqu\'à 3 profils enfants personnalisés',
       'Tous les 4 Mini-Jeux de Koko illimités',

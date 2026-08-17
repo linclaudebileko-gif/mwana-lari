@@ -5,11 +5,16 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# Build outputs
+# Build outputs & Bundled Assets
 dist/
 build/
+assets/
+public/assets/
+mwana-lari-wp/
+mwana-lari-wp.zip
 .next/
 out/
+.vercel/
 
 # Python & Virtual Environments
 __pycache__/
