@@ -33,22 +33,17 @@ export const Dictionary: React.FC = () => {
 
   const categories = [
     'Toutes',
-    'Salutations',
-    'Famille',
-    'Corps Humain',
-    'Animaux',
-    'Nourriture',
-    'Maison',
-    'Vêtements',
-    'Temps & Saisons',
-    'Nature & Éléments',
-    'Transports & Ville',
-    'Métiers & Activités',
-    'Personnes',
-    'Nombres',
-    'Verbes',
-    'Sentiments & Qualités',
-    'Patrimoine & Sagesse'
+    'Salutations & Politesse',
+    'Actions & Verbes',
+    'Famille & Relations',
+    'Nourriture & Cuisine',
+    'Corps & Santé',
+    'Nature, Faune & Flore',
+    'Maison & Quotidien',
+    'Nombres & Temps',
+    'Patrimoine & Culture',
+    'Qualités & Descriptions',
+    'Vocabulaire Général',
   ];
 
   const levels = [
@@ -62,7 +57,7 @@ export const Dictionary: React.FC = () => {
 
   const canAddWords = user && ['ADMIN', 'LINGUIST', 'TEACHER'].includes(user.role);
 
-  // All combined words (335 base words + any newly added custom words)
+  // All combined words (2668 base words + any newly added custom words)
   const allAvailableWords = useMemo(() => {
     return [...customWords, ...LARI_WORDS];
   }, [customWords]);
@@ -79,7 +74,10 @@ export const Dictionary: React.FC = () => {
         (item.culturalNote && item.culturalNote.toLowerCase().includes(q)) ||
         (item.phonetic && item.phonetic.toLowerCase().includes(q));
 
-      const matchesCat = selectedCategory === 'Toutes' || item.category === selectedCategory;
+      const matchesCat =
+        selectedCategory === 'Toutes' ||
+        item.category === selectedCategory ||
+        (item.category && item.category.toLowerCase().includes(selectedCategory.toLowerCase()));
       const matchesLevel = selectedLevel === 'ALL' || item.difficultyLevel === selectedLevel;
 
       return matchesSearch && matchesCat && matchesLevel;
