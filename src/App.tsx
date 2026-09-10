@@ -6,12 +6,17 @@ import { Header } from './components/Header';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 import { Dashboard } from './components/Dashboard';
 import { AudioLab } from './components/AudioLab';
+import { KokoGames } from './components/KokoGames';
 import { Dictionary } from './components/Dictionary';
 import { BakuluHeritage } from './components/BakuluHeritage';
 import { FamilyChallenges } from './components/FamilyChallenges';
 import { SchoolDashboard } from './components/SchoolDashboard';
-import { KokoGames } from './components/KokoGames';
-import { BookOpen, Mic, Volume2, Users, GraduationCap, Sparkles, Gamepad2 } from 'lucide-react';
+import { AdminSubscriptionsDashboard } from './components/AdminSubscriptionsDashboard';
+import { LessonModal } from './components/LessonModal';
+import { ParentalPinModal } from './components/ParentalPinModal';
+import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
+import { LegalNoticeModal } from './components/LegalNoticeModal';
+import { BookOpen, Mic, Volume2, Users, GraduationCap, Sparkles, Gamepad2, Shield, Scale, ShieldCheck } from 'lucide-react';
 import { playSuccessChime } from './utils/audio';
 import { registerServiceWorker, isOnline as checkIsOnline, addNetworkStatusListener, syncPendingProgressWithBackend } from './utils/pwa';
 import {
@@ -25,18 +30,18 @@ import {
 } from './utils/offlineStorage';
 import { lessonsAPI } from './services/api';
 
-export type ActiveTab = 'dashboard' | 'audiolab' | 'games' | 'dictionary' | 'heritage' | 'family' | 'school';
+export type ActiveTab = 'dashboard' | 'audiolab' | 'games' | 'dictionary' | 'heritage' | 'family' | 'school' | 'admin';
 
 // Helper to get initial tab from URL hash (#dictionary) or query param (?tab=dictionary)
 const getInitialTab = (): ActiveTab => {
   if (typeof window !== 'undefined') {
     const hash = window.location.hash.replace('#', '').toLowerCase();
-    if (['dashboard', 'audiolab', 'games', 'dictionary', 'heritage', 'family', 'school'].includes(hash)) {
+    if (['dashboard', 'audiolab', 'games', 'dictionary', 'heritage', 'family', 'school', 'admin'].includes(hash)) {
       return hash as ActiveTab;
     }
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get('tab')?.toLowerCase();
-    if (tabParam && ['dashboard', 'audiolab', 'games', 'dictionary', 'heritage', 'family', 'school'].includes(tabParam)) {
+    if (tabParam && ['dashboard', 'audiolab', 'games', 'dictionary', 'heritage', 'family', 'school', 'admin'].includes(tabParam)) {
       return tabParam as ActiveTab;
     }
   }
@@ -44,28 +49,53 @@ const getInitialTab = (): ActiveTab => {
 };
 
 function MwanaLariApp() {
-  const { activeChild, activeRole, updateActiveChildStats } = useAuth();
+  const { user, activeChild, activeRole, updateActiveChildStats, isParentUnlocked } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [activeTab, setActiveTab] = useState<ActiveTab>(getInitialTab);
   const [isOnline, setIsOnline] = useState<boolean>(checkIsOnline());
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [customRole, setCustomRole] = useState<UserRole | null>(null);
   const [isUpdateAvailable, setIsUpdateAvailable] = useState<boolean>(false);
+  const [isParentalPinModalOpen, setIsParentalPinModalOpen] = useState<boolean>(false);
+  const [pendingTabTarget, setPendingTabTarget] = useState<ActiveTab | null>(null);
+  const [pendingRoleTarget, setPendingRoleTarget] = useState<UserRole | null>(null);
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState<boolean>(false);
+  const [isLegalModalOpen, setIsLegalModalOpen] = useState<boolean>(false);
 
   const currentRole = customRole || activeRole;
+
+  // Auto-redirect if non-admin tries to access admin tab
+  useEffect(() => {
+    if (activeTab === 'admin' && !isAdmin) {
+      setActiveTab('dashboard');
+      if (window.location.hash.replace('#', '').toLowerCase() === 'admin') {
+        window.location.hash = '';
+      }
+    }
+  }, [isAdmin, activeTab]);
 
   // Listen to browser hash changes (e.g. #dictionary)
   useEffect(() => {
     const handleHashChange = () => {
       const currentHash = window.location.hash.replace('#', '').toLowerCase();
-      if (['dashboard', 'audiolab', 'games', 'dictionary', 'heritage', 'family', 'school'].includes(currentHash)) {
-        setActiveTab(currentHash as ActiveTab);
+      if (['dashboard', 'audiolab', 'games', 'dictionary', 'heritage', 'family', 'school', 'admin'].includes(currentHash)) {
+        if (currentHash === 'admin' && !isAdmin) {
+          setActiveTab('dashboard');
+          return;
+        }
+        if ((currentHash === 'family' || currentHash === 'school' || currentHash === 'admin') && !isParentUnlocked) {
+          setPendingTabTarget(currentHash as ActiveTab);
+          setIsParentalPinModalOpen(true);
+        } else {
+          setActiveTab(currentHash as ActiveTab);
+        }
       }
     };
 
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
+  }, [isParentUnlocked, isAdmin]);
 
   // Initialize PWA, Service Worker, and IndexedDB cache
   useEffect(() => {
@@ -80,7 +110,7 @@ function MwanaLariApp() {
       refreshPendingSyncCount();
     });
 
-    // 3. Initialize IndexedDB & Seed local cache
+    // 3. Initialize IndexedDB & Seed local cache non-blocking in background
     const setupLocalDatabase = async () => {
       try {
         await initOfflineDB();
@@ -103,7 +133,11 @@ function MwanaLariApp() {
       }
     };
 
-    setupLocalDatabase();
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      (window as unknown as { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(() => setupLocalDatabase());
+    } else {
+      setTimeout(setupLocalDatabase, 300);
+    }
 
     return () => unsubscribe();
   }, []);
@@ -118,6 +152,14 @@ function MwanaLariApp() {
   };
 
   const handleTabChange = (tab: ActiveTab) => {
+    if (tab === 'admin' && !isAdmin) {
+      return;
+    }
+    if ((tab === 'family' || tab === 'school' || tab === 'admin') && !isParentUnlocked) {
+      setPendingTabTarget(tab);
+      setIsParentalPinModalOpen(true);
+      return;
+    }
     playSuccessChime();
     setActiveTab(tab);
     window.location.hash = tab;
@@ -138,20 +180,34 @@ function MwanaLariApp() {
       xp: newXp,
       level: newLevel,
       streak: activeChild.streakDays,
-      lastUpdated: new Date().toISOString(),
     });
 
     // If completed a lesson, record progress
     if (lessonId) {
       if (isOnline) {
         try {
-          await lessonsAPI.completeLesson(lessonId, 100, amount);
+          await lessonsAPI.submitProgress({
+            childId: activeChild.id,
+            lessonId,
+            score: 100,
+            xpEarned: amount,
+          });
         } catch {
-          await queueOfflineProgress(activeChild.id, lessonId, 100, amount);
+          await queueOfflineProgress({
+            childId: activeChild.id,
+            lessonId,
+            score: 100,
+            xpEarned: amount,
+          });
           refreshPendingSyncCount();
         }
       } else {
-        await queueOfflineProgress(activeChild.id, lessonId, 100, amount);
+        await queueOfflineProgress({
+          childId: activeChild.id,
+          lessonId,
+          score: 100,
+          xpEarned: amount,
+        });
         refreshPendingSyncCount();
       }
     }
@@ -169,6 +225,14 @@ function MwanaLariApp() {
   };
 
   const handleRoleChange = (role: UserRole) => {
+    if (role === 'ADMIN' && !isAdmin) {
+      return;
+    }
+    if ((role === 'PARENT' || role === 'TEACHER' || role === 'ADMIN') && !isParentUnlocked) {
+      setPendingRoleTarget(role);
+      setIsParentalPinModalOpen(true);
+      return;
+    }
     setCustomRole(role);
     if (role === 'TEACHER') {
       handleTabChange('school');
@@ -176,10 +240,13 @@ function MwanaLariApp() {
       handleTabChange('heritage');
     } else if (role === 'PARENT') {
       handleTabChange('family');
+    } else if (role === 'ADMIN') {
+      handleTabChange('admin');
     } else {
       handleTabChange('dashboard');
     }
   };
+
 
   return (
     <div className="min-h-screen flex flex-col bg-savanna-100">
@@ -296,6 +363,21 @@ function MwanaLariApp() {
             <span>École</span>
           </button>
 
+          {isAdmin && (
+            <button
+              id="nav-tab-admin"
+              onClick={() => handleTabChange('admin')}
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
+                activeTab === 'admin'
+                  ? 'bg-gradient-to-r from-brand-700 via-amber-600 to-terracotta-600 text-white shadow-md shadow-brand-500/30 ring-2 ring-amber-300'
+                  : 'text-brand-900 bg-brand-50/90 hover:bg-brand-100 border border-brand-300'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600" />
+              <span>Administration & Abonnements</span>
+            </button>
+          )}
+
         </div>
       </nav>
 
@@ -325,22 +407,83 @@ function MwanaLariApp() {
         {activeTab === 'family' && <FamilyChallenges />}
 
         {activeTab === 'school' && <SchoolDashboard />}
+
+        {activeTab === 'admin' && isAdmin && <AdminSubscriptionsDashboard />}
       </main>
 
       {/* Footer */}
-      <footer className="glass-card border-t border-brand-300 py-6 px-4 text-center text-xs text-savanna-800 space-y-2 mt-12">
+      <footer className="glass-card border-t border-brand-300 py-6 px-4 text-center text-xs text-savanna-800 space-y-3 mt-12">
         <div className="font-extrabold text-brand-800 text-sm">
           🇨🇬 Mwana Lari — EdTech & Patrimoine Linguistique
         </div>
         <p className="max-w-xl mx-auto font-medium">
           « Apprendre sa langue. Comprendre ses racines. Préparer son avenir. »
         </p>
+        
+        {/* Compliance & Privacy Links */}
+        <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] font-bold text-savanna-800 pt-1 border-t border-brand-200/60 max-w-lg mx-auto">
+          <button
+            onClick={() => setIsPrivacyModalOpen(true)}
+            className="hover:text-brand-700 underline decoration-brand-400 transition-colors flex items-center gap-1"
+          >
+            <Shield className="w-3 h-3 text-forest-600" />
+            <span>Vie Privée & Données Mineurs (Loi n° 29-2019)</span>
+          </button>
+          <span>•</span>
+          <button
+            onClick={() => setIsLegalModalOpen(true)}
+            className="hover:text-brand-700 underline decoration-brand-400 transition-colors flex items-center gap-1"
+          >
+            <Scale className="w-3 h-3 text-amber-700" />
+            <span>Mentions Légales & Sécurité (RFC 9116)</span>
+          </button>
+        </div>
+
         <div className="text-[11px] text-savanna-700 font-semibold flex items-center justify-center gap-2">
           <span>Propulsé par Mwana Languages SaaS Platform</span>
           <span>•</span>
           <span className="text-forest-700 font-bold">Mises à jour automatiques PWA actives (v2.1)</span>
         </div>
       </footer>
+
+      {/* Parental Gate PIN Modal for Protected Tabs & Role Switches */}
+      <ParentalPinModal
+        isOpen={isParentalPinModalOpen}
+        onClose={() => {
+          setIsParentalPinModalOpen(false);
+          setPendingTabTarget(null);
+          setPendingRoleTarget(null);
+        }}
+        onSuccess={() => {
+          if (pendingTabTarget) {
+            playSuccessChime();
+            setActiveTab(pendingTabTarget);
+            window.location.hash = pendingTabTarget;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            setPendingTabTarget(null);
+          }
+          if (pendingRoleTarget) {
+            setCustomRole(pendingRoleTarget);
+            if (pendingRoleTarget === 'TEACHER') handleTabChange('school');
+            else if (pendingRoleTarget === 'PARENT') handleTabChange('family');
+            else if (pendingRoleTarget === 'ELDER') handleTabChange('heritage');
+            else if (pendingRoleTarget === 'ADMIN') handleTabChange('admin');
+            setPendingRoleTarget(null);
+          }
+        }}
+      />
+
+      {/* Privacy Policy Modal */}
+      <PrivacyPolicyModal
+        isOpen={isPrivacyModalOpen}
+        onClose={() => setIsPrivacyModalOpen(false)}
+      />
+
+      {/* Legal Notice & Security Modal */}
+      <LegalNoticeModal
+        isOpen={isLegalModalOpen}
+        onClose={() => setIsLegalModalOpen(false)}
+      />
 
     </div>
   );

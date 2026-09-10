@@ -59,15 +59,36 @@ export const initOfflineDB = (): Promise<IDBDatabase> => {
   });
 };
 
-// 1. Words Store
+// 1. Words Store (Optimized: Check count first to avoid re-writing 2668 records every startup)
 export const saveOfflineWords = async (words: LariWord[]): Promise<void> => {
   const db = await initOfflineDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction('words', 'readwrite');
-    const store = tx.objectStore('words');
-    words.forEach((w) => store.put(w));
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
+    const checkTx = db.transaction('words', 'readonly');
+    const store = checkTx.objectStore('words');
+    const countReq = store.count();
+
+    countReq.onsuccess = () => {
+      // If already fully cached, resolve immediately (0ms)
+      if (countReq.result >= words.length) {
+        return resolve();
+      }
+
+      // Otherwise write missing in a single batch
+      const writeTx = db.transaction('words', 'readwrite');
+      const writeStore = writeTx.objectStore('words');
+      words.forEach((w) => writeStore.put(w));
+      writeTx.oncomplete = () => resolve();
+      writeTx.onerror = () => reject(writeTx.error);
+    };
+
+    countReq.onerror = () => {
+      // Fallback direct write
+      const writeTx = db.transaction('words', 'readwrite');
+      const writeStore = writeTx.objectStore('words');
+      words.forEach((w) => writeStore.put(w));
+      writeTx.oncomplete = () => resolve();
+      writeTx.onerror = () => reject(writeTx.error);
+    };
   });
 };
 
@@ -82,15 +103,33 @@ export const getOfflineWords = async (): Promise<LariWord[]> => {
   });
 };
 
-// 2. Stories Store
+// 2. Stories Store (Optimized: Check count first)
 export const saveOfflineStories = async (stories: CulturalStory[]): Promise<void> => {
   const db = await initOfflineDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction('stories', 'readwrite');
-    const store = tx.objectStore('stories');
-    stories.forEach((s) => store.put(s));
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
+    const checkTx = db.transaction('stories', 'readonly');
+    const store = checkTx.objectStore('stories');
+    const countReq = store.count();
+
+    countReq.onsuccess = () => {
+      if (countReq.result >= stories.length) {
+        return resolve();
+      }
+
+      const writeTx = db.transaction('stories', 'readwrite');
+      const writeStore = writeTx.objectStore('stories');
+      stories.forEach((s) => writeStore.put(s));
+      writeTx.oncomplete = () => resolve();
+      writeTx.onerror = () => reject(writeTx.error);
+    };
+
+    countReq.onerror = () => {
+      const writeTx = db.transaction('stories', 'readwrite');
+      const writeStore = writeTx.objectStore('stories');
+      stories.forEach((s) => writeStore.put(s));
+      writeTx.oncomplete = () => resolve();
+      writeTx.onerror = () => reject(writeTx.error);
+    };
   });
 };
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useDeferredValue } from 'react';
 import { LARI_WORDS } from '../data/mockData';
 import { WordItem } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -21,10 +21,15 @@ import {
 import { speakNativeWord, playSuccessChime, preloadAudio } from '../utils/audio';
 import { AddWordModal } from './AddWordModal';
 
+interface IndexedWordItem extends WordItem {
+  _searchIndex: string;
+}
+
 export const Dictionary: React.FC = () => {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('Toutes');
+  const deferredSearchTerm = useDeferredValue(searchTerm);
+  const [selectedCategory, setSelectedCategory] = useState<string>('Toutes');
   const [selectedLevel, setSelectedLevel] = useState<number | 'ALL'>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [customWords, setCustomWords] = useState<WordItem[]>([]);
@@ -65,32 +70,28 @@ export const Dictionary: React.FC = () => {
 
   const canAddWords = user && ['ADMIN', 'LINGUIST', 'TEACHER'].includes(user.role);
 
-  // All combined words (2668 base words + any newly added custom words)
-  const allAvailableWords = useMemo(() => {
-    return [...customWords, ...LARI_WORDS];
+  // Pre-indexed words for ultra-fast matching (0ms)
+  const indexedWords = useMemo<IndexedWordItem[]>(() => {
+    const rawList = [...customWords, ...LARI_WORDS];
+    return rawList.map((item) => ({
+      ...item,
+      _searchIndex: `${item.wordNative} ${item.translationFr} ${item.translationEn || ''} ${item.phonetic || ''} ${item.culturalNote || ''}`.toLowerCase(),
+    }));
   }, [customWords]);
 
-  // Instant in-memory filtering (0ms latency, 100% offline & fast)
+  // Ultra-fast filter with deferred search term (never freezes keystrokes)
   const filteredWords = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
-    return allAvailableWords.filter((item) => {
-      const matchesSearch =
-        !q ||
-        item.wordNative.toLowerCase().includes(q) ||
-        item.translationFr.toLowerCase().includes(q) ||
-        (item.translationEn && item.translationEn.toLowerCase().includes(q)) ||
-        (item.culturalNote && item.culturalNote.toLowerCase().includes(q)) ||
-        (item.phonetic && item.phonetic.toLowerCase().includes(q));
+    const q = deferredSearchTerm.trim().toLowerCase();
+    const isAllCat = selectedCategory === 'Toutes';
+    const isAllLevel = selectedLevel === 'ALL';
 
-      const matchesCat =
-        selectedCategory === 'Toutes' ||
-        item.category === selectedCategory ||
-        (item.category && item.category.toLowerCase().includes(selectedCategory.toLowerCase()));
-      const matchesLevel = selectedLevel === 'ALL' || item.difficultyLevel === selectedLevel;
-
+    return indexedWords.filter((item) => {
+      const matchesSearch = !q || item._searchIndex.includes(q);
+      const matchesCat = isAllCat || item.category === selectedCategory || (item.category && item.category.includes(selectedCategory));
+      const matchesLevel = isAllLevel || item.difficultyLevel === selectedLevel;
       return matchesSearch && matchesCat && matchesLevel;
     });
-  }, [allAvailableWords, searchTerm, selectedCategory, selectedLevel]);
+  }, [indexedWords, deferredSearchTerm, selectedCategory, selectedLevel]);
 
   // Paginated slice
   const paginatedWords = useMemo(() => {
@@ -98,13 +99,13 @@ export const Dictionary: React.FC = () => {
     return filteredWords.slice(start, start + itemsPerPage);
   }, [filteredWords, currentPage]);
 
-  // Preload audio for visible words on active page for instant 0ms playback
+  // Preload audio only for the first 4 visible items to save bandwidth and connections
   useEffect(() => {
     const timer = setTimeout(() => {
-      paginatedWords.forEach((w) => {
+      paginatedWords.slice(0, 4).forEach((w) => {
         preloadAudio(w.audioUrl || w.wordNative);
       });
-    }, 100);
+    }, 150);
     return () => clearTimeout(timer);
   }, [paginatedWords]);
 
@@ -138,12 +139,12 @@ export const Dictionary: React.FC = () => {
             </h2>
           </div>
           <p className="text-xs sm:text-sm text-savanna-900 font-medium mt-1">
-            Explorez les <strong>{allAvailableWords.length} mots et expressions Lari authentiques</strong> du Pool et de Brazzaville avec prononciation audio, classes nominales et contextes culturels.
+            Explorez les <strong>{indexedWords.length} mots et expressions Lari authentiques</strong> du Pool et de Brazzaville avec prononciation audio, classes nominales et contextes culturels.
           </p>
           <div className="flex items-center gap-1.5 sm:gap-2 mt-2 flex-wrap">
             <span className="text-[10px] sm:text-[11px] font-extrabold px-2.5 sm:px-3 py-1 rounded-full bg-blue-100 text-blue-900 border border-blue-300 flex items-center gap-1 shadow-sm">
               <Database className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-600" />
-              {allAvailableWords.length} mots enregistrés
+              {indexedWords.length} mots enregistrés
             </span>
             <span className="text-[10px] sm:text-[11px] font-extrabold px-2.5 sm:px-3 py-1 rounded-full bg-forest-100 text-forest-900 border border-forest-300 flex items-center gap-1 shadow-sm">
               <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-forest-600" />
