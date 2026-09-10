@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { LARI_WORDS } from '../data/mockData';
 import { WordItem } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -18,7 +18,7 @@ import {
   Layers,
   X
 } from 'lucide-react';
-import { speakNativeWord, playSuccessChime } from '../utils/audio';
+import { speakNativeWord, playSuccessChime, preloadAudio } from '../utils/audio';
 import { AddWordModal } from './AddWordModal';
 
 export const Dictionary: React.FC = () => {
@@ -29,7 +29,15 @@ export const Dictionary: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [customWords, setCustomWords] = useState<WordItem[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [playingWordId, setPlayingWordId] = useState<string | null>(null);
   const itemsPerPage = 24;
+
+  const handlePlayWord = (word: WordItem) => {
+    setPlayingWordId(word.id);
+    speakNativeWord(word.wordNative, word.audioUrl, {
+      onEnd: () => setPlayingWordId(null),
+    });
+  };
 
   const categories = [
     'Toutes',
@@ -89,6 +97,16 @@ export const Dictionary: React.FC = () => {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredWords.slice(start, start + itemsPerPage);
   }, [filteredWords, currentPage]);
+
+  // Preload audio for visible words on active page for instant 0ms playback
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      paginatedWords.forEach((w) => {
+        preloadAudio(w.audioUrl || w.wordNative);
+      });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [paginatedWords]);
 
   const totalPages = Math.ceil(filteredWords.length / itemsPerPage) || 1;
 
@@ -242,11 +260,15 @@ export const Dictionary: React.FC = () => {
                   </div>
 
                   <button
-                    onClick={() => speakNativeWord(word.wordNative, word.audioUrl)}
-                    className="p-2 sm:p-2.5 rounded-2xl bg-gradient-to-tr from-blue-500 to-cyan-400 text-white shadow-md hover:scale-110 active:scale-95 transition-transform"
-                    title="Écouter la prononciation"
+                    onClick={() => handlePlayWord(word)}
+                    className={`p-2 sm:p-2.5 rounded-2xl text-white shadow-md transition-all flex items-center justify-center ${
+                      playingWordId === word.id
+                        ? 'bg-gradient-to-tr from-emerald-500 to-green-400 ring-4 ring-emerald-300 scale-110 animate-pulse'
+                        : 'bg-gradient-to-tr from-blue-500 to-cyan-400 hover:scale-110 active:scale-95'
+                    }`}
+                    title={playingWordId === word.id ? 'Lecture audio en cours...' : 'Écouter la prononciation'}
                   >
-                    <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <Volume2 className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${playingWordId === word.id ? 'animate-bounce' : ''}`} />
                   </button>
                 </div>
 
