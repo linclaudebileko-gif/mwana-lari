@@ -4,7 +4,9 @@ from typing import List, Dict, Any
 from ..database import get_db
 from ..models.child import Child
 from ..models.progress import ChildProgress
+from ..models.user import User
 from ..schemas.progress import ProgressSubmit, ProgressOut
+from ..auth.dependencies import get_current_user
 
 router = APIRouter(prefix="", tags=["Académie & Progression"])
 
@@ -127,10 +129,25 @@ def get_lessons(
     return result
 
 @router.post("/progress/submit", response_model=ProgressOut, status_code=status.HTTP_201_CREATED)
-def submit_progress(payload: ProgressSubmit, db: Session = Depends(get_db)):
+def submit_progress(
+    payload: ProgressSubmit,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     child = db.query(Child).filter(Child.id == payload.child_id).first()
     if not child:
         raise HTTPException(status_code=404, detail="Profil enfant non trouvé.")
+
+    # Validate that current user is the parent of the child, or an Admin/Teacher
+    if current_user.role not in ["ADMIN", "TEACHER"] and child.parent_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès non autorisé : Vous ne pouvez enregistrer de progression que pour vos propres enfants."
+        )
+
+    # Sanity check score and xp
+    clean_score = max(0, min(100, payload.score))
+    clean_xp = max(0, min(100, payload.xp_earned))
 
     # Check if existing record
     record = db.query(ChildProgress).filter(
@@ -142,12 +159,12 @@ def submit_progress(payload: ProgressSubmit, db: Session = Depends(get_db)):
         record = ChildProgress(
             child_id=payload.child_id,
             lesson_id=payload.lesson_id,
-            score=payload.score,
-            xp_earned=payload.xp_earned
+            score=clean_score,
+            xp_earned=clean_xp
         )
         db.add(record)
         # Update child XP & streaks
-        child.xp_points += payload.xp_earned
+        child.xp_points += clean_xp
         child.current_streak += 1
         # Level up every 100 XP
         new_level = (child.xp_points // 100) + 1
@@ -155,8 +172,8 @@ def submit_progress(payload: ProgressSubmit, db: Session = Depends(get_db)):
             child.level = new_level
     else:
         # Update existing score if higher
-        if payload.score > record.score:
-            record.score = payload.score
+        if clean_score > record.score:
+            record.score = clean_score
 
     db.commit()
     db.refresh(record)

@@ -81,8 +81,13 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   const currentPriceEur =
     billingCycle === 'yearly' ? selectedPlan.priceEurYearly : selectedPlan.priceEurMonthly;
 
+  const [currentTxId, setCurrentTxId] = useState<string>('');
+  const [isVerifying, setIsVerifying] = useState<boolean>(false);
+  const [verifyStatusMessage, setVerifyStatusMessage] = useState<string>('');
+
   const handleStartPayment = async () => {
     setErrorMessage('');
+    setVerifyStatusMessage('');
 
     if (paymentMethod !== 'VISA_MASTERCARD') {
       const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
@@ -94,43 +99,72 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 
     playCardFlip();
     setStep('PROCESSING');
-    setCountdown(6);
+    setCountdown(10);
 
     try {
-      const resp = await paymentsAPI.initiateMomoPayment({
+      const resp = await paymentsAPI.initiateOpenPay({
         planId: selectedPlan.id,
         tier: selectedTier as 'FAMILY' | 'CLAN_DIASPORA',
         billingCycle,
         method: paymentMethod,
         phoneNumber: `${countryPrefix} ${phoneNumber}`,
         amountFcfa: currentPriceFcfa,
+        customerName: user?.fullName || 'Parent',
+        customerEmail: user?.email || 'contact@mwanalari.cg',
       });
 
-      setTransactionRef(resp.reference_code || `MOMO-${Date.now().toString().slice(-6)}`);
+      const txId = (resp as any)?.transaction_id || `tx_op_${Date.now()}`;
+      const refCode = (resp as any)?.reference_code || (resp as any)?.reference || `OP-${Date.now().toString().slice(-6)}`;
+      setCurrentTxId(txId);
+      setTransactionRef(refCode);
 
-      // Simulate USSD prompt countdown
+      // Countdown guide for user to type PIN on phone
       const interval = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(interval);
-            // Complete subscription
-            upgradeSubscription(selectedTier, {
-              planName: selectedPlan.name,
-              billingCycle,
-              paymentMethod,
-              phoneNumber: `${countryPrefix} ${phoneNumber}`,
-            });
-            playSuccessChime();
-            setStep('SUCCESS');
             return 0;
           }
           return prev - 1;
         });
       }, 1000);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Erreur lors de l\'initiation du paiement.');
+      setErrorMessage(err.message || 'Erreur lors de l\'initiation du paiement OpenPay.');
       setStep('SELECTION');
     }
+  };
+
+  const handleVerifyPayment = async () => {
+    const checkTarget = transactionRef || currentTxId;
+    if (!checkTarget) return;
+    setIsVerifying(true);
+    setVerifyStatusMessage('');
+
+    try {
+      const res = await paymentsAPI.checkOpenPayStatus(checkTarget);
+      if (res && (res.status === 'SUCCESS' || res.is_successful === true)) {
+        upgradeSubscription(selectedTier, {
+          planName: selectedPlan.name,
+          billingCycle,
+          paymentMethod,
+          phoneNumber: `${countryPrefix} ${phoneNumber}`,
+        });
+        playSuccessChime();
+        setStep('SUCCESS');
+      } else {
+        setVerifyStatusMessage('Le paiement est en cours de traitement par OpenPay / l\'opérateur. Si vous avez déjà validé votre code PIN (*105# ou *128#), patientez quelques secondes et recliquez sur Vérifier.');
+      }
+    } catch (err: any) {
+      setVerifyStatusMessage('Vérification réseau en cours. Recliquez dans quelques instants.');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleDemoConfirmAndVerify = async () => {
+    if (!currentTxId) return;
+    paymentsAPI.confirmDemoPayment(currentTxId);
+    await handleVerifyPayment();
   };
 
   if (!isOpen) return null;
@@ -393,11 +427,15 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                 >
                   <Zap className="w-5 h-5 text-amber-200 fill-amber-200 animate-bounce" />
                   <span>
-                    Valider l'abonnement ({currentPriceFcfa.toLocaleString()} FCFA / {billingCycle === 'yearly' ? 'an' : 'mois'})
+                    Payer via OpenPay ({currentPriceFcfa.toLocaleString()} FCFA / {billingCycle === 'yearly' ? 'an' : 'mois'})
                   </span>
                   <ArrowRight className="w-5 h-5" />
                 </button>
-                <p className="text-center text-[11px] text-savanna-700 font-medium mt-2">
+                <p className="text-center text-[11px] text-savanna-700 font-medium mt-2 flex items-center justify-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-forest-600" />
+                  <span>Guichet sécurisé <strong>OpenPay Congo</strong> • MTN MoMo • Airtel Money • Validation instantanée</span>
+                </p>
+                <p className="text-center text-[11px] text-savanna-700 font-medium mt-1">
                   Sans engagement • Annulable à tout moment • Facture numérique avec TVA incluse
                 </p>
               </div>
@@ -406,22 +444,24 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 
           {/* Step 2: Push Notification Pending Countdown */}
           {step === 'PROCESSING' && (
-            <div className="text-center py-8 px-4 space-y-6 animate-fadeIn">
+            <div className="text-center py-6 px-4 space-y-5 animate-fadeIn">
               <div className="relative inline-block">
                 <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-brand-500 to-amber-400 flex items-center justify-center text-white text-3xl shadow-xl mx-auto animate-pulse">
                   📱
                 </div>
-                <div className="absolute -top-1 -right-1 w-8 h-8 rounded-full bg-forest-500 text-white font-black text-xs flex items-center justify-center border-2 border-white shadow-md">
-                  {countdown}s
-                </div>
+                {countdown > 0 && (
+                  <div className="absolute -top-1 -right-1 w-8 h-8 rounded-full bg-forest-500 text-white font-black text-xs flex items-center justify-center border-2 border-white shadow-md">
+                    {countdown}s
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
                 <h3 className="text-xl sm:text-2xl font-black text-savanna-950">
-                  Vérification du Mobile Money en cours...
+                  Validez la transaction sur votre téléphone
                 </h3>
                 <p className="text-xs sm:text-sm text-savanna-800 font-medium max-w-md mx-auto">
-                  Une invitation USSD a été envoyée sur votre téléphone <strong>{countryPrefix} {phoneNumber}</strong>.
+                  Une invitation USSD a été envoyée sur votre numéro <strong>{countryPrefix} {phoneNumber}</strong>.
                 </p>
               </div>
 
@@ -429,18 +469,62 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
               <div className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-4 sm:p-5 max-w-md mx-auto text-left space-y-3 shadow-md">
                 <div className="font-extrabold text-xs text-amber-950 flex items-center gap-2">
                   <Smartphone className="w-4 h-4 text-amber-700" />
-                  <span>Instruction sur votre écran de téléphone :</span>
+                  <span>Instructions sur votre téléphone :</span>
                 </div>
                 <ol className="list-decimal pl-5 space-y-1.5 text-xs text-amber-900 font-medium">
-                  <li>Ouvrez la notification ou composez <strong>{paymentMethod === 'MTN_MOMO' ? '*105#' : '*128#'}</strong></li>
-                  <li>Entrez votre <strong>Code PIN Secret MoMo</strong></li>
+                  <li>Ouvrez la pop-up ou composez <strong>{paymentMethod === 'MTN_MOMO' ? '*105#' : '*128#'}</strong></li>
+                  <li>Entrez votre <strong>Code PIN Secret MoMo / Airtel Money</strong></li>
                   <li>Confirmez le débit de <strong>{currentPriceFcfa.toLocaleString()} FCFA</strong> (Réf: {transactionRef})</li>
                 </ol>
               </div>
 
-              <div className="flex items-center justify-center gap-2 text-xs font-bold text-brand-700">
-                <Loader2 className="w-4 h-4 animate-spin text-brand-600" />
-                <span>En attente de la confirmation réseau (Auto-validation)...</span>
+              {/* Verification Feedback Message */}
+              {verifyStatusMessage && (
+                <div className="bg-terracotta-50 border-2 border-terracotta-300 rounded-2xl p-3.5 max-w-md mx-auto text-xs text-terracotta-950 font-bold flex items-start gap-2 text-left animate-shake">
+                  <AlertCircle className="w-4 h-4 text-terracotta-600 flex-shrink-0 mt-0.5" />
+                  <span>{verifyStatusMessage}</span>
+                </div>
+              )}
+
+              {/* Action Buttons: Explicit Verification */}
+              <div className="space-y-2.5 max-w-md mx-auto pt-2">
+                <button
+                  type="button"
+                  onClick={handleVerifyPayment}
+                  disabled={isVerifying}
+                  className="w-full py-3.5 px-6 rounded-2xl bg-forest-600 hover:bg-forest-700 text-white font-black text-sm shadow-lg shadow-forest-600/30 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                >
+                  {isVerifying ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Vérification auprès de l'opérateur...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+                      <span>J'ai saisi mon code secret — Vérifier le paiement</span>
+                    </>
+                  )}
+                </button>
+
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => { setStep('SELECTION'); setVerifyStatusMessage(''); }}
+                    className="text-xs font-bold text-savanna-700 hover:text-savanna-950 underline"
+                  >
+                    ← Changer de numéro / mode
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDemoConfirmAndVerify}
+                    className="text-[11px] font-black text-brand-700 hover:text-brand-900 bg-brand-50 hover:bg-brand-100 px-2.5 py-1 rounded-xl border border-brand-200"
+                    title="Simule la réponse positive de l'opérateur pour les tests"
+                  >
+                    🧪 Simuler la validation (Test)
+                  </button>
+                </div>
               </div>
             </div>
           )}

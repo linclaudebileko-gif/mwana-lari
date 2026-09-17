@@ -51,17 +51,28 @@ def test_children_and_progress(parent_token):
     child_id = children[0]["id"]
     print(f"PASS: Parent children list (Found {len(children)} child: {children[0]['first_name']})")
 
-    # 2. Submit progress
-    res_prog = client.post("/api/v1/progress/submit", json={
+    # 2. Security Test: Unauthenticated progress submission must be rejected (401)
+    unauth_client = TestClient(app)
+    res_unauth = unauth_client.post("/api/v1/progress/submit", json={
+        "child_id": child_id,
+        "lesson_id": "l1",
+        "score": 100,
+        "xp_earned": 20
+    })
+    assert res_unauth.status_code == 401
+    print("PASS: Unauthenticated progress submission blocked with HTTP 401")
+
+    # 3. Authenticated Submit progress by parent
+    res_prog = client.post("/api/v1/progress/submit", headers=headers, json={
         "child_id": child_id,
         "lesson_id": "l1",
         "score": 100,
         "xp_earned": 20
     })
     assert res_prog.status_code == 201
-    print("PASS: Child progress submitted (+20 XP)")
+    print("PASS: Child progress submitted by authenticated parent (+20 XP)")
 
-    # 3. Get child stats
+    # 4. Get child stats
     res_stats = client.get(f"/api/v1/parents/children/{child_id}/progress", headers=headers)
     assert res_stats.status_code == 200
     stats = res_stats.json()
@@ -134,6 +145,37 @@ def test_heritage_stories(parent_token, admin_token):
     assert res_decide.json()["status"] == "APPROVED"
     print("PASS: Linguistic validation approved by Linguist Admin")
 
+def test_admin_payments_security(parent_token, admin_token):
+    # 1. Unauthenticated access to admin subscribers must return 401
+    unauth_client = TestClient(app)
+    res_unauth = unauth_client.get("/api/v1/payments/admin/subscribers")
+    assert res_unauth.status_code == 401
+    print("PASS: Unauthenticated access to /payments/admin/subscribers blocked with HTTP 401")
+
+    # 2. Non-admin (Parent) access must return 403 Forbidden
+    res_parent = client.get(
+        "/api/v1/payments/admin/subscribers",
+        headers={"Authorization": f"Bearer {parent_token}"}
+    )
+    assert res_parent.status_code == 403
+    print("PASS: Parent role access to /payments/admin/subscribers blocked with HTTP 403")
+
+    # 3. Admin access must succeed with 200
+    res_admin = client.get(
+        "/api/v1/payments/admin/subscribers",
+        headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    assert res_admin.status_code == 200
+    print("PASS: Admin role access to /payments/admin/subscribers authorized with HTTP 200")
+
+    # 4. Non-admin access to admin transactions must return 403
+    res_tx_parent = client.get(
+        "/api/v1/payments/admin/transactions",
+        headers={"Authorization": f"Bearer {parent_token}"}
+    )
+    assert res_tx_parent.status_code == 403
+    print("PASS: Parent role access to /payments/admin/transactions blocked with HTTP 403")
+
 if __name__ == "__main__":
     print("==================================================")
     print("  MWANA LARI FASTAPI BACKEND AUTOMATED TEST SUITE ")
@@ -143,6 +185,7 @@ if __name__ == "__main__":
     test_children_and_progress(parent_token)
     test_words_dictionary()
     test_heritage_stories(parent_token, admin_token)
+    test_admin_payments_security(parent_token, admin_token)
     print("==================================================")
-    print("  ALL 11 BACKEND API TESTS PASSED SUCCESSFULLY !  ")
+    print("  ALL SECURITY & FUNCTIONAL API TESTS PASSED !    ")
     print("==================================================")

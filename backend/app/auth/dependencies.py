@@ -1,19 +1,42 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.user import User
 from .security import decode_access_token
-from typing import List
+from typing import List, Optional
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+def get_current_user(
+    request: Request,
+    token_header: Optional[str] = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+) -> User:
+    """
+    Extracts and validates current user from either:
+    1. HttpOnly Secure Cookie ('mwana_access_token' or 'access_token')
+    2. Authorization Bearer header
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Identifiants invalides ou session expirée",
+        detail="Identifiants invalides ou session expirée.",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    # 1. Look in explicit Authorization Header first
+    token = None
+    if token_header:
+        token = token_header
+    elif request.headers.get("Authorization") and request.headers.get("Authorization").startswith("Bearer "):
+        token = request.headers.get("Authorization")[7:].strip()
+        
+    # 2. Fallback to HttpOnly cookies
+    if not token:
+        token = request.cookies.get("mwana_access_token") or request.cookies.get("access_token")
+            
+    if not token:
+        raise credentials_exception
     
     payload = decode_access_token(token)
     if payload is None:

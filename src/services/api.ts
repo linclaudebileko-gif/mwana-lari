@@ -1,4 +1,4 @@
-import { WordItem, CulturalStory, LessonUnit, ChildProfile, UserRole } from '../types';
+import { WordItem, CulturalStory, LessonUnit, ChildProfile, UserRole, AdminSubscriberItem, AdminTransactionItem, ManualGrantPayload, SubscriptionStateStatus, NetworkRevenueStats } from '../types';
 
 const API_BASE_URL = (typeof window !== 'undefined' && (window as any).__MWANA_API_URL__) || 'http://localhost:8000/api/v1';
 
@@ -104,6 +104,7 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
 
   try {
     const response = await fetch(url, {
+      credentials: 'include',
       ...options,
       headers,
     });
@@ -236,6 +237,15 @@ export const authAPI = {
 
   getMe: async (): Promise<any> => {
     return await apiRequest('/auth/me');
+  },
+
+  logout: async (): Promise<void> => {
+    try {
+      await apiRequest('/auth/logout', { method: 'POST' });
+    } catch {
+      // Ignore network errors on logout
+    }
+    clearStoredSession();
   },
 
   checkServerHealth: async (): Promise<boolean> => {
@@ -616,13 +626,160 @@ export const paymentsAPI = {
 
   verifyPayment: async (transactionId: string) => {
     try {
-      return await apiRequest(`/payments/verify/${transactionId}`);
+      const res = await apiRequest<{ status: string; is_successful?: boolean }>(`/payments/verify/${transactionId}`);
+      return res;
     } catch (err) {
-      // Mock successful verification after simulation
+      // En mode hors-ligne / démo, vérifie si la confirmation manuelle de test a été activée
+      const isConfirmed = localStorage.getItem(`tx_verified_${transactionId}`);
+      if (isConfirmed === 'true') {
+        return {
+          status: 'SUCCESS',
+          is_successful: true,
+          transaction_id: transactionId,
+          message: 'Paiement Mobile Money validé avec succès !',
+        };
+      }
+      return {
+        status: 'PENDING',
+        is_successful: false,
+        transaction_id: transactionId,
+        message: 'Transaction toujours en attente de validation USSD sur votre téléphone.',
+      };
+    }
+  },
+
+  confirmDemoPayment: (transactionId: string) => {
+    localStorage.setItem(`tx_verified_${transactionId}`, 'true');
+  },
+
+  // Intégration officielle OpenPay Congo (MTN MoMo & Airtel Money)
+  initiateOpenPay: async (payload: {
+    planId: string;
+    tier: 'FAMILY' | 'CLAN_DIASPORA';
+    billingCycle: 'monthly' | 'yearly';
+    method: 'MTN_MOMO' | 'AIRTEL_MONEY' | 'VISA_MASTERCARD';
+    phoneNumber: string;
+    amountFcfa: number;
+    customerName?: string;
+    customerEmail?: string;
+  }) => {
+    try {
+      const res = await apiRequest<any>('/payments/openpay/initiate', {
+        method: 'POST',
+        body: JSON.stringify({
+          plan_id: payload.planId,
+          tier: payload.tier,
+          billing_cycle: payload.billingCycle,
+          method: payload.method,
+          phone_number: payload.phoneNumber,
+          amount_fcfa: payload.amountFcfa,
+          customer_name: payload.customerName,
+          customer_email: payload.customerEmail,
+        }),
+      });
+      return res;
+    } catch (err: any) {
+      // Fallback simulation locale si le serveur backend n'est pas actif
+      const txId = `tx_op_${Date.now()}`;
+      const refCode = `OP-${Date.now().toString().slice(-6)}`;
+      const ussdGuide = payload.method === 'MTN_MOMO' ? '*105#' : '*128#';
+      return {
+        status: 'PENDING',
+        transaction_id: txId,
+        reference_code: refCode,
+        amount_fcfa: payload.amountFcfa,
+        operator: payload.method === 'MTN_MOMO' ? 'MTN MoMo Congo' : 'Airtel Money Congo',
+        provider: payload.method === 'MTN_MOMO' ? 'MTN' : 'AIRTEL',
+        phone_number: payload.phoneNumber,
+        ussd_instruction: `Composez votre code secret sur votre téléphone (${ussdGuide}) pour valider le paiement de ${payload.amountFcfa.toLocaleString()} FCFA.`,
+      };
+    }
+  },
+
+  checkOpenPayStatus: async (referenceId: string) => {
+    try {
+      return await apiRequest<any>(`/payments/openpay/check/${referenceId}`);
+    } catch {
+      const isConfirmed = localStorage.getItem(`tx_verified_${referenceId}`);
+      if (isConfirmed === 'true') {
+        return {
+          reference: referenceId,
+          status: 'SUCCESS',
+          is_successful: true,
+        };
+      }
+      return {
+        reference: referenceId,
+        status: 'PENDING',
+        is_successful: false,
+      };
+    }
+  },
+
+  // Intégration CinetPay (Guichet unifié MTN MoMo, Airtel Money, Visa / Mastercard)
+  initiateCinetPay: async (payload: {
+    planId: string;
+    tier: 'FAMILY' | 'CLAN_DIASPORA';
+    billingCycle: 'monthly' | 'yearly';
+    method: 'MTN_MOMO' | 'AIRTEL_MONEY' | 'VISA_MASTERCARD' | 'ALL';
+    phoneNumber: string;
+    amountFcfa: number;
+    customerName?: string;
+    customerEmail?: string;
+  }) => {
+    try {
+      const res = await apiRequest<any>('/payments/cinetpay/initiate', {
+        method: 'POST',
+        body: JSON.stringify({
+          plan_id: payload.planId,
+          tier: payload.tier,
+          billing_cycle: payload.billingCycle,
+          method: payload.method,
+          amount_fcfa: payload.amountFcfa,
+          customer_phone_number: payload.phoneNumber,
+          customer_name: payload.customerName || 'Famille',
+          customer_email: payload.customerEmail || 'contact@mwanalari.cg',
+        }),
+      });
+      return res;
+    } catch (err) {
+      // Fallback local simulation pour test hors-ligne
+      const txId = `cp_tx_${Date.now()}`;
+      const refCode = `CP-${Date.now().toString().slice(-6)}`;
       return {
         status: 'SUCCESS',
+        transaction_id: txId,
+        reference_code: refCode,
+        amount_fcfa: payload.amountFcfa,
+        cinetpay_response: {
+          code: '201',
+          message: 'CREATED_SIMULATED',
+          data: {
+            payment_token: `token_sim_${txId}`,
+            payment_url: `/#payment-sim?tx=${txId}`,
+            is_simulated: true,
+          }
+        }
+      };
+    }
+  },
+
+  checkCinetPayStatus: async (transactionId: string) => {
+    try {
+      return await apiRequest<any>(`/payments/cinetpay/check/${transactionId}`);
+    } catch {
+      const isConfirmed = localStorage.getItem(`tx_verified_${transactionId}`);
+      if (isConfirmed === 'true') {
+        return {
+          transaction_id: transactionId,
+          status: 'SUCCESS',
+          is_successful: true,
+        };
+      }
+      return {
         transaction_id: transactionId,
-        message: 'Paiement Mobile Money validé avec succès !',
+        status: 'PENDING',
+        is_successful: false,
       };
     }
   },
@@ -663,3 +820,580 @@ export const paymentsAPI = {
     } catch {}
   },
 };
+
+// ==========================================
+// 8. ADMINISTRATION DES ABONNEMENTS & FLUX
+// ==========================================
+
+const ADMIN_SUBS_LOCAL_KEY = 'mwana_lari_admin_subscribers_cache';
+const ADMIN_TX_LOCAL_KEY = 'mwana_lari_admin_transactions_cache';
+
+const DEFAULT_DEMO_SUBSCRIBERS: AdminSubscriberItem[] = [
+  {
+    id: 'sub_demo_001',
+    userId: '0f84b5e1-d82a-41e3-a7c3-b5e95708f11b',
+    fullName: 'Mavoungou Jean',
+    email: 'parent@mwanalari.cg',
+    phoneNumber: '+242 06 600 11 22',
+    role: 'PARENT',
+    planId: 'plan_family',
+    planName: 'Famille Mwana Lari',
+    tier: 'FAMILY',
+    status: 'ACTIVE',
+    paymentMethod: 'MTN_MOMO',
+    startDate: new Date(Date.now() - 5 * 86400000).toISOString(),
+    endDate: new Date(Date.now() + 25 * 86400000).toISOString(),
+    transactionReference: 'MOMO-854921',
+    autoRenew: true,
+  },
+  {
+    id: 'sub_demo_002',
+    userId: 'usr_diaspora_002',
+    fullName: 'Clarisse Loubaki (Diaspora Paris)',
+    email: 'clarisse.loubaki@gmail.com',
+    phoneNumber: '+33 6 12 34 56 78',
+    role: 'PARENT',
+    planId: 'plan_clan',
+    planName: 'Grand Clan & Diaspora',
+    tier: 'CLAN_DIASPORA',
+    status: 'ACTIVE',
+    paymentMethod: 'VISA_MASTERCARD',
+    startDate: new Date(Date.now() - 12 * 86400000).toISOString(),
+    endDate: new Date(Date.now() + 353 * 86400000).toISOString(),
+    transactionReference: 'STRIPE-994120',
+    autoRenew: true,
+  },
+  {
+    id: 'sub_demo_003',
+    userId: '2845b4b1-ce27-48ad-b730-63d7c3aadacb',
+    fullName: 'Maitre Clarisse (École Bacongo)',
+    email: 'enseignant@mwanalari.cg',
+    phoneNumber: '+242 05 512 88 99',
+    role: 'TEACHER',
+    planId: 'plan_clan',
+    planName: 'Partenariat Éducation (B2B)',
+    tier: 'CLAN_DIASPORA',
+    status: 'ACTIVE',
+    paymentMethod: 'AIRTEL_MONEY',
+    startDate: new Date(Date.now() - 20 * 86400000).toISOString(),
+    endDate: new Date(Date.now() + 160 * 86400000).toISOString(),
+    transactionReference: 'AIRTEL-331094',
+    autoRenew: true,
+  },
+  {
+    id: 'sub_demo_004',
+    userId: 'usr_demo_004',
+    fullName: 'Bikoumou Guy-Roger',
+    email: 'guy.bikoumou@yahoo.fr',
+    phoneNumber: '+242 06 654 32 10',
+    role: 'PARENT',
+    planId: 'plan_family',
+    planName: 'Famille Mwana Lari',
+    tier: 'FAMILY',
+    status: 'ACTIVE',
+    paymentMethod: 'MTN_MOMO',
+    startDate: new Date(Date.now() - 2 * 86400000).toISOString(),
+    endDate: new Date(Date.now() + 28 * 86400000).toISOString(),
+    transactionReference: 'MOMO-771204',
+    autoRenew: true,
+  },
+  {
+    id: 'sub_demo_005',
+    userId: 'usr_demo_005',
+    fullName: 'Nkouka Marie-Chantal',
+    email: 'marie.nkouka@gmail.com',
+    phoneNumber: '+242 05 444 88 11',
+    role: 'PARENT',
+    planId: 'plan_family',
+    planName: 'Famille Mwana Lari',
+    tier: 'FAMILY',
+    status: 'ACTIVE',
+    paymentMethod: 'AIRTEL_MONEY',
+    startDate: new Date(Date.now() - 8 * 86400000).toISOString(),
+    endDate: new Date(Date.now() + 22 * 86400000).toISOString(),
+    transactionReference: 'AIRTEL-455219',
+    autoRenew: true,
+  },
+  {
+    id: 'sub_demo_006',
+    userId: 'usr_demo_006',
+    fullName: 'Makosso Antoine (Diaspora Londres)',
+    email: 'antoine.makosso@hotmail.com',
+    phoneNumber: '+44 7700 900077',
+    role: 'PARENT',
+    planId: 'plan_clan',
+    planName: 'Grand Clan & Diaspora',
+    tier: 'CLAN_DIASPORA',
+    status: 'ACTIVE',
+    paymentMethod: 'VISA_MASTERCARD',
+    startDate: new Date(Date.now() - 15 * 86400000).toISOString(),
+    endDate: new Date(Date.now() + 15 * 86400000).toISOString(),
+    transactionReference: 'STRIPE-883011',
+    autoRenew: true,
+  },
+  {
+    id: 'sub_demo_007',
+    userId: 'usr_demo_007',
+    fullName: 'Massamba Patrick (Makelekele)',
+    email: 'patrick.massamba@gmail.com',
+    phoneNumber: '+242 06 912 34 56',
+    role: 'PARENT',
+    planId: 'plan_clan',
+    planName: 'Grand Clan & Diaspora',
+    tier: 'CLAN_DIASPORA',
+    status: 'ACTIVE',
+    paymentMethod: 'MTN_MOMO',
+    startDate: new Date(Date.now() - 1 * 86400000).toISOString(),
+    endDate: new Date(Date.now() + 29 * 86400000).toISOString(),
+    transactionReference: 'MOMO-991402',
+    autoRenew: true,
+  },
+  {
+    id: 'sub_demo_008',
+    userId: 'usr_demo_008',
+    fullName: 'Loudi Sylvain',
+    email: 'sylvain.loudi@outlook.fr',
+    phoneNumber: '+242 05 333 22 11',
+    role: 'PARENT',
+    planId: 'plan_family',
+    planName: 'Famille Mwana Lari',
+    tier: 'FAMILY',
+    status: 'EXPIRED',
+    paymentMethod: 'AIRTEL_MONEY',
+    startDate: new Date(Date.now() - 40 * 86400000).toISOString(),
+    endDate: new Date(Date.now() - 10 * 86400000).toISOString(),
+    transactionReference: 'AIRTEL-110982',
+    autoRenew: false,
+  },
+  {
+    id: 'sub_demo_009',
+    userId: 'usr_demo_009',
+    fullName: 'Moukassa Germaine (Poto-Poto)',
+    email: 'germaine.moukassa@yahoo.com',
+    phoneNumber: '+242 06 888 77 66',
+    role: 'PARENT',
+    planId: 'plan_family',
+    planName: 'Famille Mwana Lari (Annuel)',
+    tier: 'FAMILY',
+    status: 'ACTIVE',
+    paymentMethod: 'MTN_MOMO',
+    startDate: new Date(Date.now() - 30 * 86400000).toISOString(),
+    endDate: new Date(Date.now() + 335 * 86400000).toISOString(),
+    transactionReference: 'MOMO-300192',
+    autoRenew: true,
+  },
+  {
+    id: 'sub_demo_010',
+    userId: 'usr_demo_010',
+    fullName: 'Ntsika Paul (Mfilou)',
+    email: 'paul.ntsika@gmail.com',
+    phoneNumber: '+242 05 111 00 99',
+    role: 'PARENT',
+    planId: 'plan_clan',
+    planName: 'Grand Clan & Diaspora',
+    tier: 'CLAN_DIASPORA',
+    status: 'ACTIVE',
+    paymentMethod: 'AIRTEL_MONEY',
+    startDate: new Date(Date.now() - 3 * 86400000).toISOString(),
+    endDate: new Date(Date.now() + 27 * 86400000).toISOString(),
+    transactionReference: 'AIRTEL-662019',
+    autoRenew: true,
+  },
+  {
+    id: 'sub_demo_011',
+    userId: 'usr_demo_011',
+    fullName: 'Koumba Beatrice (Diaspora Bruxelles)',
+    email: 'beatrice.koumba@skynet.be',
+    phoneNumber: '+32 470 12 34 56',
+    role: 'PARENT',
+    planId: 'plan_family',
+    planName: 'Famille Mwana Lari (Annuel)',
+    tier: 'FAMILY',
+    status: 'ACTIVE',
+    paymentMethod: 'VISA_MASTERCARD',
+    startDate: new Date(Date.now() - 60 * 86400000).toISOString(),
+    endDate: new Date(Date.now() + 305 * 86400000).toISOString(),
+    transactionReference: 'STRIPE-442109',
+    autoRenew: true,
+  },
+  {
+    id: 'sub_demo_012',
+    userId: 'usr_demo_012',
+    fullName: 'Bouanga Roch (Kinkala)',
+    email: 'roch.bouanga@gmail.com',
+    phoneNumber: '+242 06 777 55 44',
+    role: 'PARENT',
+    planId: 'plan_family',
+    planName: 'Famille Mwana Lari',
+    tier: 'FAMILY',
+    status: 'ACTIVE',
+    paymentMethod: 'MTN_MOMO',
+    startDate: new Date(Date.now() - 14 * 86400000).toISOString(),
+    endDate: new Date(Date.now() + 16 * 86400000).toISOString(),
+    transactionReference: 'MOMO-551023',
+    autoRenew: true,
+  }
+];
+
+const DEFAULT_DEMO_TRANSACTIONS: AdminTransactionItem[] = [
+  {
+    id: 'tx_demo_001',
+    userId: '0f84b5e1-d82a-41e3-a7c3-b5e95708f11b',
+    userName: 'Mavoungou Jean',
+    userEmail: 'parent@mwanalari.cg',
+    planId: 'plan_family',
+    planName: 'Famille Mwana Lari',
+    amount: 1500,
+    currency: 'XAF',
+    provider: 'MTN_MOMO',
+    phoneNumber: '+242 06 600 11 22',
+    status: 'SUCCESS',
+    transactionRef: 'MOMO-854921',
+    providerTransactionId: 'OP-MTN-854921',
+    createdAt: new Date(Date.now() - 5 * 86400000).toISOString(),
+  },
+  {
+    id: 'tx_demo_002',
+    userId: 'usr_diaspora_002',
+    userName: 'Clarisse Loubaki',
+    userEmail: 'clarisse.loubaki@gmail.com',
+    planId: 'plan_clan',
+    planName: 'Grand Clan & Diaspora (Annuel)',
+    amount: 49.99,
+    currency: 'EUR',
+    provider: 'VISA_MASTERCARD',
+    phoneNumber: '+33 6 12 34 56 78',
+    status: 'SUCCESS',
+    transactionRef: 'STRIPE-994120',
+    providerTransactionId: 'ch_3N8e192xX90',
+    createdAt: new Date(Date.now() - 12 * 86400000).toISOString(),
+  },
+  {
+    id: 'tx_demo_003',
+    userId: '2845b4b1-ce27-48ad-b730-63d7c3aadacb',
+    userName: 'Maitre Clarisse',
+    userEmail: 'enseignant@mwanalari.cg',
+    planId: 'plan_clan',
+    planName: 'Partenariat Éducation (B2B)',
+    amount: 25000,
+    currency: 'XAF',
+    provider: 'AIRTEL_MONEY',
+    phoneNumber: '+242 05 512 88 99',
+    status: 'SUCCESS',
+    transactionRef: 'AIRTEL-331094',
+    providerTransactionId: 'OP-AIR-331094',
+    createdAt: new Date(Date.now() - 20 * 86400000).toISOString(),
+  },
+  {
+    id: 'tx_demo_004',
+    userId: 'usr_demo_004',
+    userName: 'Bikoumou Guy-Roger',
+    userEmail: 'guy.bikoumou@yahoo.fr',
+    planId: 'plan_family',
+    planName: 'Famille Mwana Lari',
+    amount: 1500,
+    currency: 'XAF',
+    provider: 'MTN_MOMO',
+    phoneNumber: '+242 06 654 32 10',
+    status: 'SUCCESS',
+    transactionRef: 'MOMO-771204',
+    providerTransactionId: 'OP-MTN-771204',
+    createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+  },
+  {
+    id: 'tx_demo_005',
+    userId: 'usr_demo_005',
+    userName: 'Nkouka Marie-Chantal',
+    userEmail: 'marie.nkouka@gmail.com',
+    planId: 'plan_family',
+    planName: 'Famille Mwana Lari',
+    amount: 1500,
+    currency: 'XAF',
+    provider: 'AIRTEL_MONEY',
+    phoneNumber: '+242 05 444 88 11',
+    status: 'SUCCESS',
+    transactionRef: 'AIRTEL-455219',
+    providerTransactionId: 'OP-AIR-455219',
+    createdAt: new Date(Date.now() - 8 * 86400000).toISOString(),
+  },
+  {
+    id: 'tx_demo_006',
+    userId: 'usr_demo_006',
+    userName: 'Makosso Antoine',
+    userEmail: 'antoine.makosso@hotmail.com',
+    planId: 'plan_clan',
+    planName: 'Grand Clan & Diaspora',
+    amount: 4.99,
+    currency: 'EUR',
+    provider: 'VISA_MASTERCARD',
+    phoneNumber: '+44 7700 900077',
+    status: 'SUCCESS',
+    transactionRef: 'STRIPE-883011',
+    providerTransactionId: 'ch_4M9f203yY99',
+    createdAt: new Date(Date.now() - 15 * 86400000).toISOString(),
+  },
+  {
+    id: 'tx_demo_007',
+    userId: 'usr_demo_007',
+    userName: 'Massamba Patrick',
+    userEmail: 'patrick.massamba@gmail.com',
+    planId: 'plan_clan',
+    planName: 'Grand Clan & Diaspora',
+    amount: 2500,
+    currency: 'XAF',
+    provider: 'MTN_MOMO',
+    phoneNumber: '+242 06 912 34 56',
+    status: 'PENDING',
+    transactionRef: 'MOMO-991402',
+    providerTransactionId: 'OP-MTN-991402',
+    createdAt: new Date(Date.now() - 1 * 86400000).toISOString(),
+  },
+  {
+    id: 'tx_demo_008',
+    userId: 'usr_demo_008',
+    userName: 'Loudi Sylvain',
+    userEmail: 'sylvain.loudi@outlook.fr',
+    planId: 'plan_family',
+    planName: 'Famille Mwana Lari',
+    amount: 1500,
+    currency: 'XAF',
+    provider: 'AIRTEL_MONEY',
+    phoneNumber: '+242 05 333 22 11',
+    status: 'FAILED',
+    transactionRef: 'AIRTEL-110982',
+    providerTransactionId: 'OP-AIR-ERR402',
+    createdAt: new Date(Date.now() - 10 * 86400000).toISOString(),
+  },
+  {
+    id: 'tx_demo_009',
+    userId: 'usr_demo_009',
+    userName: 'Moukassa Germaine',
+    userEmail: 'germaine.moukassa@yahoo.com',
+    planId: 'plan_family',
+    planName: 'Famille Mwana Lari (Annuel)',
+    amount: 15000,
+    currency: 'XAF',
+    provider: 'MTN_MOMO',
+    phoneNumber: '+242 06 888 77 66',
+    status: 'SUCCESS',
+    transactionRef: 'MOMO-300192',
+    providerTransactionId: 'OP-MTN-300192',
+    createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
+  },
+  {
+    id: 'tx_demo_010',
+    userId: 'usr_demo_010',
+    userName: 'Ntsika Paul',
+    userEmail: 'paul.ntsika@gmail.com',
+    planId: 'plan_clan',
+    planName: 'Grand Clan & Diaspora',
+    amount: 2500,
+    currency: 'XAF',
+    provider: 'AIRTEL_MONEY',
+    phoneNumber: '+242 05 111 00 99',
+    status: 'SUCCESS',
+    transactionRef: 'AIRTEL-662019',
+    providerTransactionId: 'OP-AIR-662019',
+    createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+  },
+  {
+    id: 'tx_demo_011',
+    userId: 'usr_demo_011',
+    userName: 'Koumba Beatrice',
+    userEmail: 'beatrice.koumba@skynet.be',
+    planId: 'plan_family',
+    planName: 'Famille Mwana Lari (Annuel)',
+    amount: 24.99,
+    currency: 'EUR',
+    provider: 'VISA_MASTERCARD',
+    phoneNumber: '+32 470 12 34 56',
+    status: 'SUCCESS',
+    transactionRef: 'STRIPE-442109',
+    providerTransactionId: 'ch_5K1a304zZ11',
+    createdAt: new Date(Date.now() - 60 * 86400000).toISOString(),
+  },
+  {
+    id: 'tx_demo_012',
+    userId: 'usr_demo_012',
+    userName: 'Bouanga Roch',
+    userEmail: 'roch.bouanga@gmail.com',
+    planId: 'plan_family',
+    planName: 'Famille Mwana Lari',
+    amount: 1500,
+    currency: 'XAF',
+    provider: 'MTN_MOMO',
+    phoneNumber: '+242 06 777 55 44',
+    status: 'SUCCESS',
+    transactionRef: 'MOMO-551023',
+    providerTransactionId: 'OP-MTN-551023',
+    createdAt: new Date(Date.now() - 14 * 86400000).toISOString(),
+  }
+];
+
+export const adminSubscriptionsAPI = {
+  getSubscribers: async (): Promise<AdminSubscriberItem[]> => {
+    try {
+      const data = await apiRequest<AdminSubscriberItem[]>('/payments/admin/subscribers');
+      if (data && data.length > 0) {
+        localStorage.setItem(ADMIN_SUBS_LOCAL_KEY, JSON.stringify(data));
+        return data;
+      }
+    } catch {
+      // Fallback
+    }
+
+    const localJson = localStorage.getItem(ADMIN_SUBS_LOCAL_KEY);
+    if (localJson) {
+      try {
+        const parsed = JSON.parse(localJson);
+        if (Array.isArray(parsed) && parsed.length >= 10) {
+          return parsed;
+        }
+      } catch {}
+    }
+    localStorage.setItem(ADMIN_SUBS_LOCAL_KEY, JSON.stringify(DEFAULT_DEMO_SUBSCRIBERS));
+    return DEFAULT_DEMO_SUBSCRIBERS;
+  },
+
+  getTransactions: async (): Promise<AdminTransactionItem[]> => {
+    try {
+      const data = await apiRequest<AdminTransactionItem[]>('/payments/admin/transactions');
+      if (data && data.length > 0) {
+        localStorage.setItem(ADMIN_TX_LOCAL_KEY, JSON.stringify(data));
+        return data;
+      }
+    } catch {
+      // Fallback
+    }
+
+    const localJson = localStorage.getItem(ADMIN_TX_LOCAL_KEY);
+    if (localJson) {
+      try {
+        const parsed = JSON.parse(localJson);
+        if (Array.isArray(parsed) && parsed.length >= 10) {
+          return parsed;
+        }
+      } catch {}
+    }
+    localStorage.setItem(ADMIN_TX_LOCAL_KEY, JSON.stringify(DEFAULT_DEMO_TRANSACTIONS));
+    return DEFAULT_DEMO_TRANSACTIONS;
+  },
+
+  grantSubscription: async (payload: ManualGrantPayload): Promise<any> => {
+    try {
+      const resp = await apiRequest('/payments/admin/grant', {
+        method: 'POST',
+        body: JSON.stringify({
+          email_or_phone: payload.emailOrPhone,
+          full_name: payload.fullName || 'Famille Partenaire',
+          tier: payload.tier,
+          duration_months: payload.durationMonths,
+          notes: payload.notes || '',
+        }),
+      });
+      return resp;
+    } catch (err) {
+      // Local simulated grant
+      const localSubs = (await adminSubscriptionsAPI.getSubscribers()).slice();
+      const newSub: AdminSubscriberItem = {
+        id: `sub_manual_${Date.now()}`,
+        userId: `usr_${Date.now()}`,
+        fullName: payload.fullName || payload.emailOrPhone.split('@')[0],
+        email: payload.emailOrPhone.includes('@') ? payload.emailOrPhone : `${payload.emailOrPhone}@mwanalari.cg`,
+        phoneNumber: !payload.emailOrPhone.includes('@') ? payload.emailOrPhone : '+242 06 000 00 00',
+        role: 'PARENT',
+        planId: payload.tier === 'CLAN_DIASPORA' ? 'plan_clan' : 'plan_family',
+        planName: payload.tier === 'CLAN_DIASPORA' ? 'Grand Clan & Diaspora' : 'Famille Mwana Lari',
+        tier: payload.tier,
+        status: 'ACTIVE',
+        paymentMethod: 'MTN_MOMO',
+        startDate: new Date().toISOString(),
+        endDate: new Date(Date.now() + payload.durationMonths * 30 * 86400000).toISOString(),
+        transactionReference: `ADMIN-GRANT-${Date.now().toString().slice(-6)}`,
+        autoRenew: true,
+      };
+
+      const updated = [newSub, ...localSubs];
+      localStorage.setItem(ADMIN_SUBS_LOCAL_KEY, JSON.stringify(updated));
+      return { status: 'SUCCESS', message: 'Abonnement accordé (Mode Local)' };
+    }
+  },
+
+  updateSubscriptionStatus: async (subId: string, status?: SubscriptionStateStatus, extendMonths?: number): Promise<any> => {
+    try {
+      return await apiRequest(`/payments/admin/subscriptions/${subId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status,
+          extend_months: extendMonths || 0,
+        }),
+      });
+    } catch (err) {
+      const localSubs = (await adminSubscriptionsAPI.getSubscribers()).map((s) => {
+        if (s.id === subId) {
+          const newEndDate = extendMonths && extendMonths > 0
+            ? new Date(new Date(s.endDate).getTime() + extendMonths * 30 * 86400000).toISOString()
+            : s.endDate;
+          return {
+            ...s,
+            status: status || s.status,
+            endDate: newEndDate,
+          };
+        }
+        return s;
+      });
+      localStorage.setItem(ADMIN_SUBS_LOCAL_KEY, JSON.stringify(localSubs));
+      return { status: 'SUCCESS' };
+    }
+  },
+
+  simulateTransaction: async (payload: {
+    provider: 'MTN_MOMO' | 'AIRTEL_MONEY' | 'VISA_MASTERCARD';
+    phoneNumber: string;
+    amount: number;
+    currency: 'XAF' | 'EUR';
+    status: 'SUCCESS' | 'PENDING' | 'FAILED';
+    tier: 'FAMILY' | 'CLAN_DIASPORA';
+    userEmail?: string;
+  }): Promise<any> => {
+    try {
+      return await apiRequest('/payments/admin/simulate-tx', {
+        method: 'POST',
+        body: JSON.stringify({
+          provider: payload.provider,
+          phone_number: payload.phoneNumber,
+          amount: payload.amount,
+          currency: payload.currency,
+          status: payload.status,
+          tier: payload.tier,
+          user_email: payload.userEmail,
+        }),
+      });
+    } catch (err) {
+      // Local fallback simulation
+      const txs = (await adminSubscriptionsAPI.getTransactions()).slice();
+      const ref = `SIM-${payload.provider.slice(0, 3)}-${Date.now().toString().slice(-6)}`;
+      const newTx: AdminTransactionItem = {
+        id: `tx_${Date.now()}`,
+        userId: `usr_sim_${Date.now()}`,
+        userName: payload.userEmail ? payload.userEmail.split('@')[0] : 'Client MoMo / Airtel',
+        userEmail: payload.userEmail || 'client@mwanalari.cg',
+        planId: payload.tier === 'CLAN_DIASPORA' ? 'plan_clan' : 'plan_family',
+        planName: payload.tier === 'CLAN_DIASPORA' ? 'Grand Clan & Diaspora' : 'Famille Mwana Lari',
+        amount: payload.amount,
+        currency: payload.currency,
+        provider: payload.provider,
+        phoneNumber: payload.phoneNumber,
+        status: payload.status,
+        transactionRef: ref,
+        providerTransactionId: `OP-${ref}`,
+        createdAt: new Date().toISOString(),
+      };
+
+      const updated = [newTx, ...txs];
+      localStorage.setItem(ADMIN_TX_LOCAL_KEY, JSON.stringify(updated));
+      return { status: 'SUCCESS', message: 'Transaction simulée (Mode Local)' };
+    }
+  },
+};
+

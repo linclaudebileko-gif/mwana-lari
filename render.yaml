@@ -18,6 +18,10 @@ services:
         value: production
       - key: ALLOWED_ORIGINS
         value: "*"
+      - key: OPENPAY_BASE_URL
+        value: "https://api.openpay-cg.com/v1"
+      - key: OPENPAY_API_KEY
+        sync: false
 
 # 2. Base de Données PostgreSQL Gérée
 databases:
