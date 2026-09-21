@@ -210,54 +210,75 @@ def seed_database():
             db.commit()
             print(f"[SEED] OK - {len(stories_data)} contes et proverbes patrimoniaux inseres.")
 
-        # 6. Seed Subscription Plans
+        # 6. Seed Subscription Plans (Idempotent)
         from ..models.subscription import SubscriptionPlan
-        if db.query(SubscriptionPlan).count() == 0:
-            plans_data = [
-                SubscriptionPlan(
-                    id="plan_free",
-                    name="Découverte (Gratuit)",
-                    tier="FREE",
-                    billing_period="MONTHLY",
-                    price_xaf=0,
-                    price_eur=0.0,
-                    max_children=1,
-                    description="Pour s'initier aux premiers mots de Lari."
-                ),
-                SubscriptionPlan(
-                    id="plan_family_monthly",
-                    name="Famille Mwana Lari (Mensuel)",
-                    tier="FAMILY",
-                    billing_period="MONTHLY",
-                    price_xaf=1500,
-                    price_eur=2.49,
-                    max_children=3,
-                    description="Accès complet aux 529 mots, contes et jeux pour la famille."
-                ),
-                SubscriptionPlan(
-                    id="plan_family_annual",
-                    name="Famille Mwana Lari (Annuel)",
-                    tier="FAMILY",
-                    billing_period="ANNUAL",
-                    price_xaf=15000,
-                    price_eur=24.99,
-                    max_children=3,
-                    description="Accès annuel complet avec 2 mois offerts."
-                ),
-                SubscriptionPlan(
-                    id="plan_clan_monthly",
-                    name="Grand Clan & Diaspora",
-                    tier="CLAN_DIASPORA",
-                    billing_period="MONTHLY",
-                    price_xaf=2500,
-                    price_eur=4.99,
-                    max_children=10,
-                    description="Pour les grandes familles et la diaspora avec profils illimités."
-                )
-            ]
-            db.add_all(plans_data)
-            db.commit()
-            print("[SEED] OK - Forfaits d'abonnement Mobile Money inseres en base.")
+        expected_plans = [
+            {
+                "id": "plan_free",
+                "name": "Découverte (Gratuit)",
+                "tier": "FREE",
+                "billing_period": "MONTHLY",
+                "price_xaf": 0,
+                "price_eur": 0.0,
+                "max_children": 1,
+                "description": "Pour s'initier aux premiers mots de Lari."
+            },
+            {
+                "id": "plan_family_monthly",
+                "name": "Famille Mwana Lari (Mensuel)",
+                "tier": "FAMILY",
+                "billing_period": "MONTHLY",
+                "price_xaf": 1500,
+                "price_eur": 2.49,
+                "max_children": 3,
+                "description": "Accès complet aux 529 mots, contes et jeux pour la famille."
+            },
+            {
+                "id": "plan_family_annual",
+                "name": "Famille Mwana Lari (Annuel)",
+                "tier": "FAMILY",
+                "billing_period": "ANNUAL",
+                "price_xaf": 15000,
+                "price_eur": 24.99,
+                "max_children": 3,
+                "description": "Accès annuel complet avec 2 mois offerts."
+            },
+            {
+                "id": "plan_clan_monthly",
+                "name": "Grand Clan & Diaspora (Mensuel)",
+                "tier": "CLAN_DIASPORA",
+                "billing_period": "MONTHLY",
+                "price_xaf": 2500,
+                "price_eur": 4.99,
+                "max_children": 10,
+                "description": "Pour les grandes familles et la diaspora avec profils illimités."
+            },
+            {
+                "id": "plan_clan_annual",
+                "name": "Grand Clan & Diaspora (Annuel)",
+                "tier": "CLAN_DIASPORA",
+                "billing_period": "ANNUAL",
+                "price_xaf": 25000,
+                "price_eur": 49.99,
+                "max_children": 10,
+                "description": "Accès annuel grand clan avec 2 mois offerts et suivi personnalisé."
+            }
+        ]
+        
+        for p_data in expected_plans:
+            existing_p = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == p_data["id"]).first()
+            if not existing_p:
+                db.add(SubscriptionPlan(**p_data))
+            else:
+                existing_p.name = p_data["name"]
+                existing_p.tier = p_data["tier"]
+                existing_p.billing_period = p_data["billing_period"]
+                existing_p.price_xaf = p_data["price_xaf"]
+                existing_p.price_eur = p_data["price_eur"]
+                existing_p.max_children = p_data["max_children"]
+                existing_p.description = p_data["description"]
+        db.commit()
+        print("[SEED] OK - Forfaits d'abonnement Mobile Money synchronises en base (dont plan_clan_annual).")
 
         print("[SEED] Base de donnees Mwana Lari initialisee et peuplee avec succes !")
 

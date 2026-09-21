@@ -52,6 +52,34 @@ def get_current_user(
     
     return user
 
+def get_optional_current_user(
+    request: Request,
+    token_header: Optional[str] = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """
+    Tente d'extraire l'utilisateur courant sans lever d'exception s'il n'est pas authentifié.
+    """
+    token = None
+    if token_header:
+        token = token_header
+    elif request.headers.get("Authorization") and request.headers.get("Authorization").startswith("Bearer "):
+        token = request.headers.get("Authorization")[7:].strip()
+    if not token:
+        token = request.cookies.get("mwana_access_token") or request.cookies.get("access_token")
+    if not token:
+        return None
+    
+    payload = decode_access_token(token)
+    if not payload:
+        return None
+    
+    user_id = payload.get("sub")
+    if not user_id:
+        return None
+    
+    return db.query(User).filter(User.id == user_id).first()
+
 def require_roles(allowed_roles: List[str]):
     def role_checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in allowed_roles:
@@ -61,3 +89,4 @@ def require_roles(allowed_roles: List[str]):
             )
         return current_user
     return role_checker
+

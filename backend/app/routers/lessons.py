@@ -5,8 +5,10 @@ from ..database import get_db
 from ..models.child import Child
 from ..models.progress import ChildProgress
 from ..models.user import User
+from ..models.subscription import UserSubscription
 from ..schemas.progress import ProgressSubmit, ProgressOut
 from ..auth.dependencies import get_current_user
+import datetime
 
 router = APIRouter(prefix="", tags=["Académie & Progression"])
 
@@ -144,6 +146,22 @@ def submit_progress(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Accès non autorisé : Vous ne pouvez enregistrer de progression que pour vos propres enfants."
         )
+
+    # Vérifier si l'unité requiert un abonnement Premium (Niveaux 2, 3, 4, 5)
+    lesson_unit = next((u for u in LESSON_ROADMAP if u["id"] == payload.lesson_id), None)
+    if lesson_unit and lesson_unit.get("level", 1) > 1 and current_user.role not in ["ADMIN", "TEACHER"]:
+        now = datetime.datetime.utcnow()
+        sub = db.query(UserSubscription).filter(
+            UserSubscription.user_id == current_user.id,
+            UserSubscription.status == "ACTIVE"
+        ).order_by(UserSubscription.created_at.desc()).first()
+
+        is_active_sub = bool(sub and (sub.end_date is None or sub.end_date > now))
+        if not is_active_sub:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cette unité pédagogique avancée fait partie du parcours complet Mwana Lari réservé aux abonnés. Veuillez souscrire à un forfait pour continuer."
+            )
 
     # Sanity check score and xp
     clean_score = max(0, min(100, payload.score))

@@ -5,9 +5,11 @@ from ..database import get_db
 from ..models.user import User
 from ..models.child import Child
 from ..models.progress import ChildProgress
+from ..models.subscription import UserSubscription, SubscriptionPlan
 from ..schemas.child import ChildCreate, ChildUpdate, ChildOut
 from ..schemas.progress import ChildStatsOut
 from ..auth.dependencies import get_current_user, require_roles
+import datetime
 
 router = APIRouter(prefix="/parents", tags=["Espace Parents & Enfants"])
 
@@ -17,6 +19,30 @@ def create_child(
     current_user: User = Depends(require_roles(["PARENT", "ADMIN"])),
     db: Session = Depends(get_db)
 ):
+    # Vérification stricte des quotas d'enfants selon le forfait de l'abonnement
+    if current_user.role != "ADMIN":
+        now = datetime.datetime.utcnow()
+        sub = db.query(UserSubscription).filter(
+            UserSubscription.user_id == current_user.id,
+            UserSubscription.status == "ACTIVE"
+        ).order_by(UserSubscription.created_at.desc()).first()
+
+        max_children = 1 # Découverte / Gratuit par défaut
+        if sub and (sub.end_date is None or sub.end_date > now):
+            plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == sub.plan_id).first()
+            if plan:
+                max_children = plan.max_children
+            elif "clan" in (sub.plan_id or "").lower():
+                max_children = 10
+            else:
+                max_children = 3
+
+        existing_children_count = db.query(Child).filter(Child.parent_id == current_user.id).count()
+        if existing_children_count >= max_children:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Limite de {max_children} profil(s) enfant atteinte pour votre forfait. Passez à l'abonnement Famille ou Clan pour en ajouter d'autres."
+            )
     child = Child(
         parent_id=current_user.id,
         first_name=payload.first_name,

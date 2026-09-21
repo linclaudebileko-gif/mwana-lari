@@ -103,10 +103,17 @@ class OpenPayClient:
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
+        
+        # Identifiant client externe obligatoire exigé par OpenPay
+        ext_client_id = (metadata.get("user_id") if metadata else None)
+        if not ext_client_id or ext_client_id in ("anonymous", "anonymous_family"):
+            ext_client_id = f"parent_{clean_phone[-8:]}"
+
         payload = {
-            "amount": str(amount_fcfa),
+            "amount": int(amount_fcfa),
             "payment_phone_number": clean_phone,
-            "provider": provider_code
+            "provider": provider_code,
+            "customer_external_id": str(ext_client_id)
         }
         if metadata:
             payload["metadata"] = metadata
@@ -159,12 +166,25 @@ class OpenPayClient:
         Vérifie le statut d'une transaction via l'endpoint officiel OpenPay :
         GET https://api.openpay-cg.com/v1/transaction/status/:referenceId
         """
-        if not self.is_configured or reference_id.startswith("SIM-"):
+        if not self.is_configured:
+            logger.warning("[OpenPay] Clé API non configurée.")
+            return {
+                "success": False,
+                "reference": reference_id,
+                "status": "pending",
+                "is_successful": False,
+                "is_failed": False,
+                "message": "Passerelle OpenPay non configurée (clé manquante)."
+            }
+        
+        if reference_id.startswith("SIM-"):
             return {
                 "success": True,
                 "reference": reference_id,
-                "status": "success",
-                "message": "Transaction de test validée avec succès."
+                "status": "pending",
+                "is_successful": False,
+                "is_failed": False,
+                "message": "Transaction de simulation en attente de validation."
             }
 
         url = f"{self.base_url}/transaction/status/{reference_id}"
