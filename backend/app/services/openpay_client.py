@@ -127,20 +127,25 @@ class OpenPayClient:
                 
                 if response.status_code in (200, 201):
                     ref = data.get("reference") or data.get("transaction_id") or data.get("id")
-                    logger.info(f"[OpenPay] Succès initiation paiement: ref={ref}")
+                    status_val = (data.get("status") or "pending").lower()
+                    is_failed = status_val in ("failed", "rejected", "error", "cancelled")
+                    msg = data.get("message") or ("Demande envoyée sur votre téléphone." if not is_failed else "Paiement refusé par l'opérateur.")
+                    
+                    logger.info(f"[OpenPay] Réponse initiation: ref={ref} status={status_val} is_failed={is_failed} msg={msg}")
                     return {
-                        "success": True,
+                        "success": not is_failed,
                         "mode": "LIVE",
                         "reference": ref,
-                        "status": data.get("status", "pending"),
+                        "status": "FAILED" if is_failed else ("SUCCESS" if status_val in ("success", "successful") else "PENDING"),
                         "amount": data.get("amount", str(amount_fcfa)),
                         "provider": provider_code,
                         "payment_phone_number": clean_phone,
-                        "message": data.get("message", "Demande envoyée sur votre téléphone."),
+                        "message": msg,
+                        "error": msg if is_failed else None,
                         "ussd_instruction": (
                             f"Un message USSD a été envoyé au {phone_number}. "
                             f"Veuillez composer votre code secret {'MTN (*105#)' if provider_code == 'MTN' else 'Airtel (*128#)'} pour confirmer."
-                        ),
+                        ) if not is_failed else msg,
                         "raw": data
                     }
                 else:

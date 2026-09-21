@@ -261,6 +261,10 @@ async def initiate_openpay_payment(request: OpenPayInitiateRequest, db: Session 
     tx_id = f"tx_{uuid.uuid4().hex[:12]}"
     ref_code = openpay_resp.get("reference") or f"OP-{datetime.datetime.utcnow().strftime('%M%S%f')[:8]}"
 
+    is_success = openpay_resp.get("success", False)
+    status_str = openpay_resp.get("status", "PENDING" if is_success else "FAILED")
+    error_detail = openpay_resp.get("message") or openpay_resp.get("error") or openpay_resp.get("raw", {}).get("message") or ""
+
     try:
         new_tx = PaymentTransaction(
             id=tx_id,
@@ -270,7 +274,7 @@ async def initiate_openpay_payment(request: OpenPayInitiateRequest, db: Session 
             currency="XAF",
             provider=request.method,
             phone_number=clean_phone,
-            status="PENDING",
+            status=status_str,
             transaction_ref=ref_code,
             provider_transaction_id=openpay_resp.get("reference") or f"OP-{ref_code}"
         )
@@ -279,13 +283,28 @@ async def initiate_openpay_payment(request: OpenPayInitiateRequest, db: Session 
     except Exception as e:
         db.rollback()
 
+    if not is_success or status_str == "FAILED":
+        return {
+            "success": False,
+            "status": "FAILED",
+            "transaction_id": tx_id,
+            "reference_code": ref_code,
+            "reference": ref_code,
+            "amount_fcfa": request.amount_fcfa,
+            "operator": "MTN MoMo Congo" if provider_code == "MTN" else "Airtel Money Congo",
+            "message": error_detail or "Transaction rejetée par l'opérateur.",
+            "error": error_detail or "Transaction rejetée par l'opérateur.",
+            "mode": openpay_resp.get("mode", "LIVE"),
+            "raw": openpay_resp.get("raw", {})
+        }
+
     ussd_msg = openpay_resp.get("ussd_instruction") or (
         f"Un message USSD a été envoyé au {clean_phone}. "
         f"Composez {'*105#' if provider_code == 'MTN' else '*128#'} pour approuver le débit de {request.amount_fcfa:,} FCFA."
     )
 
     return {
-        "success": openpay_resp.get("success", True),
+        "success": True,
         "transaction_id": tx_id,
         "reference_code": ref_code,
         "reference": ref_code,

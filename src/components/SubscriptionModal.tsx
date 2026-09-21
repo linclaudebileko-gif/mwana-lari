@@ -90,6 +90,11 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
     setErrorMessage('');
     setVerifyStatusMessage('');
 
+    if (!user) {
+      setErrorMessage("Veuillez vous connecter ou créer un compte parent avant de souscrire, afin de lier votre abonnement et le retrouver sur tous vos appareils.");
+      return;
+    }
+
     if (paymentMethod !== 'VISA_MASTERCARD') {
       const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
       if (cleanPhone.length < 8) {
@@ -103,23 +108,39 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
     setCountdown(10);
 
     try {
+      const isYearly = billingCycle === 'yearly';
+      let exactPlanId = selectedPlan.id;
+      if (exactPlanId === 'plan_family' || selectedTier === 'FAMILY') {
+        exactPlanId = isYearly ? 'plan_family_annual' : 'plan_family_monthly';
+      } else if (exactPlanId === 'plan_clan' || selectedTier === 'CLAN_DIASPORA') {
+        exactPlanId = isYearly ? 'plan_clan_annual' : 'plan_clan_monthly';
+      }
+
       const resp = await paymentsAPI.initiateOpenPay({
-        planId: selectedPlan.id,
+        planId: exactPlanId,
         tier: selectedTier as 'FAMILY' | 'CLAN_DIASPORA',
         billingCycle,
         method: paymentMethod,
         phoneNumber: `${countryPrefix} ${phoneNumber}`,
         amountFcfa: currentPriceFcfa,
+        userId: user?.id,
         customerName: user?.fullName || 'Parent',
         customerEmail: user?.email || 'contact@mwanalari.cg',
       });
+
+      if (resp && ((resp as any).success === false || (resp as any).status === 'FAILED')) {
+        const errorMsg = (resp as any).message || (resp as any).error || 'La transaction a été rejetée par l\'opérateur.';
+        setErrorMessage(`Échec opérateur (${paymentMethod === 'MTN_MOMO' ? 'MTN MoMo' : 'Airtel Money'}) : ${errorMsg}`);
+        setStep('SELECTION');
+        return;
+      }
 
       const txId = (resp as any)?.transaction_id || `tx_op_${Date.now()}`;
       const refCode = (resp as any)?.reference_code || (resp as any)?.reference || `OP-${Date.now().toString().slice(-6)}`;
       setCurrentTxId(txId);
       setTransactionRef(refCode);
 
-      // Countdown guide for user to type PIN on phone
+      // Compte à rebours indicatif (n'active PAS automatiquement l'abonnement)
       const interval = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -136,15 +157,40 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   };
 
   const handleVerifyPayment = async () => {
-    const checkTarget = transactionRef || currentTxId || `TX-${Date.now()}`;
+    const checkTarget = transactionRef || currentTxId;
+    if (!checkTarget) {
+      setVerifyStatusMessage('Aucune référence de transaction à vérifier.');
+      return;
+    }
+
     setIsVerifying(true);
     setVerifyStatusMessage('');
 
     try {
-      // 1. Tente une vérification si l'API en ligne répond
+      // 1. Vérification réelle auprès de l'API OpenPay Congo / MoMo
       const res = await paymentsAPI.checkOpenPayStatus(checkTarget);
+      
       if (res && (res.status === 'SUCCESS' || res.is_successful === true)) {
-        upgradeSubscription(selectedTier, {
+        // Sauvegarde de la transaction confirmée dans le cache local admin
+        try {
+          const storedTx = localStorage.getItem('mwana_lari_admin_transactions_cache');
+          const txList = storedTx ? JSON.parse(storedTx) : [];
+          txList.unshift({
+            id: currentTxId || checkTarget,
+            reference: operatorSmsRef.trim() || transactionRef || checkTarget,
+            userFullName: user?.fullName || 'Abonné Mobile',
+            userEmail: user?.email || 'parent@mwanalari.cg',
+            phoneNumber: `${countryPrefix} ${phoneNumber}`,
+            amountFcfa: currentPriceFcfa,
+            planTier: selectedTier,
+            provider: paymentMethod,
+            status: 'SUCCESS',
+            createdAt: new Date().toISOString()
+          });
+          localStorage.setItem('mwana_lari_admin_transactions_cache', JSON.stringify(txList.slice(0, 50)));
+        } catch {}
+
+        await upgradeSubscription(selectedTier, {
           planName: selectedPlan.name,
           billingCycle,
           paymentMethod,
@@ -155,42 +201,26 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
         setIsVerifying(false);
         return;
       }
-    } catch {
-      // API distante en mode hors-ligne / autonome
+
+      if (res && (res.status === 'FAILED' || res.is_failed === true || res.status === 'CANCELLED')) {
+        setIsVerifying(false);
+        setVerifyStatusMessage("Le paiement a été refusé ou a expiré. Veuillez vous assurer d'avoir un solde suffisant et recommencer.");
+        return;
+      }
+
+      // Si le statut est encore PENDING (le client n'a pas encore validé son code secret)
+      setIsVerifying(false);
+      const ussdCode = paymentMethod === 'MTN_MOMO' ? '*105#' : '*128#';
+      setVerifyStatusMessage(
+        `Paiement en attente : vous n'avez pas encore validé le débit sur votre téléphone. Veuillez composer ${ussdCode} pour saisir votre code secret, puis cliquez à nouveau sur le bouton ci-dessous.`
+      );
+    } catch (err: any) {
+      setIsVerifying(false);
+      const ussdCode = paymentMethod === 'MTN_MOMO' ? '*105#' : '*128#';
+      setVerifyStatusMessage(
+        `Paiement en cours de traitement : composez ${ussdCode} sur votre téléphone pour valider avec votre code secret, puis réessayez.`
+      );
     }
-
-    // 2. Validation immédiate garantie pour ne jamais bloquer l'abonné
-    paymentsAPI.confirmDemoPayment(checkTarget);
-    
-    // Sauvegarde de la transaction dans le cache local admin
-    try {
-      const storedTx = localStorage.getItem('mwana_lari_admin_transactions_cache');
-      const txList = storedTx ? JSON.parse(storedTx) : [];
-      txList.unshift({
-        id: currentTxId || `tx_${Date.now()}`,
-        reference: operatorSmsRef.trim() || transactionRef || `REF-${Date.now().toString().slice(-6)}`,
-        userFullName: user?.fullName || 'Abonné Mobile',
-        userEmail: user?.email || 'parent@mwanalari.cg',
-        phoneNumber: `${countryPrefix} ${phoneNumber}`,
-        amountFcfa: currentPriceFcfa,
-        planTier: selectedTier,
-        provider: paymentMethod,
-        status: 'SUCCESS',
-        createdAt: new Date().toISOString()
-      });
-      localStorage.setItem('mwana_lari_admin_transactions_cache', JSON.stringify(txList.slice(0, 50)));
-    } catch {}
-
-    // Déblocage immédiat de l'abonnement
-    upgradeSubscription(selectedTier, {
-      planName: selectedPlan.name,
-      billingCycle,
-      paymentMethod,
-      phoneNumber: `${countryPrefix} ${phoneNumber}`,
-    });
-    playSuccessChime();
-    setStep('SUCCESS');
-    setIsVerifying(false);
   };
 
   const handleDemoConfirmAndVerify = async () => {
