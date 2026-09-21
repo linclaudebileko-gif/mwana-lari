@@ -12,7 +12,7 @@ from ..models.subscription import SubscriptionPlan, UserSubscription, PaymentTra
 from ..models.user import User
 from ..config import settings
 from ..auth.rate_limiter import rate_limit
-from ..auth.dependencies import get_current_user, require_roles
+from ..auth.dependencies import get_current_user, get_optional_current_user, require_roles
 
 router = APIRouter(prefix="/payments", tags=["Payments & Mobile Money"])
 
@@ -102,7 +102,232 @@ def get_subscription_plans(db: Session = Depends(get_db)):
         ]
     return plans
 
+@router.get("/my-subscription")
+def get_my_subscription(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Retourne l'état réel de l'abonnement de l'utilisateur connecté depuis la base de données.
+    Permet la synchronisation immédiate sur tous les téléphones et tablettes.
+    """
+    now = datetime.datetime.utcnow()
+    sub = db.query(UserSubscription).filter(
+        UserSubscription.user_id == current_user.id
+    ).order_by(UserSubscription.created_at.desc()).first()
+
+    if sub and sub.status == "ACTIVE" and (sub.end_date is None or sub.end_date > now):
+        plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == sub.plan_id).first()
+        is_annual = "annual" in (sub.plan_id or "").lower() or (plan and plan.billing_period == "ANNUAL")
+        tier = plan.tier if plan else ("CLAN_DIASPORA" if "clan" in (sub.plan_id or "").lower() else "FAMILY")
+        plan_name = plan.name if plan else ("Grand Clan & Diaspora" if "clan" in (sub.plan_id or "").lower() else "Famille Mwana Lari")
+        max_kids = plan.max_children if plan else (10 if "clan" in (sub.plan_id or "").lower() else 3)
+        return {
+            "is_premium": True,
+            "tier": tier,
+            "plan_id": sub.plan_id,
+            "plan_name": plan_name,
+            "billing_cycle": "yearly" if is_annual else "monthly",
+            "status": "ACTIVE",
+            "start_date": sub.start_date.isoformat() if sub.start_date else None,
+            "expires_at": sub.end_date.isoformat() if sub.end_date else None,
+            "max_children": max_kids,
+            "payment_method": sub.payment_method,
+            "auto_renew": sub.auto_renew
+        }
+
+    return {
+        "is_premium": False,
+        "tier": "FREE",
+        "plan_id": "plan_free",
+        "plan_name": "Découverte (Gratuit)",
+        "billing_cycle": "monthly",
+        "status": "EXPIRED" if sub else "INACTIVE",
+        "start_date": None,
+        "expires_at": sub.end_date.isoformat() if (sub and sub.end_date) else None,
+        "max_children": 1,
+        "payment_method": "FREE",
+        "auto_renew": False
+    }
+
+from ..services.openpay_client import openpay_client
 from ..services.momo_direct import mtn_momo_client, airtel_money_client
+
+class OpenPayInitiateRequest(BaseModel):
+    plan_id: str
+    tier: Optional[str] = "FAMILY"
+    billing_cycle: Optional[str] = "monthly"
+    method: str = "MTN_MOMO" # 'MTN_MOMO', 'AIRTEL_MONEY', 'VISA_MASTERCARD'
+    phone_number: str
+    amount_fcfa: int
+    user_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+
+def _get_or_create_payer_user(db: Session, user_id: Optional[str], phone_number: str, name: Optional[str] = None) -> User:
+    """Garantit un identifiant utilisateur valide pour la table payment_transactions."""
+    clean_phone = openpay_client.format_phone_number(phone_number)
+    user = None
+    if user_id and user_id not in ("anonymous", "anonymous_family", "anonymous_user"):
+        user = db.query(User).filter(User.id == user_id).first()
+    if not user and clean_phone:
+        user = db.query(User).filter(User.phone_number == clean_phone).first()
+    if not user:
+        guest_email = f"user_{clean_phone[-8:]}@mwanalari.cg"
+        user = db.query(User).filter(User.email == guest_email).first()
+        if not user:
+            user = User(
+                id=str(uuid.uuid4()),
+                email=guest_email,
+                phone_number=clean_phone,
+                password_hash="GUEST_NO_PASSWORD",
+                role="PARENT",
+                full_name=name or f"Parent ({clean_phone})",
+                country_code="CG"
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+    return user
+
+def _activate_subscription_for_tx(db: Session, tx: PaymentTransaction):
+    """Active ou prolonge l'abonnement en base pour la transaction validée."""
+    plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == tx.plan_id).first()
+    is_annual = "annual" in (tx.plan_id or "").lower() or (plan and plan.billing_period == "ANNUAL")
+    duration_days = 365 if is_annual else 30
+    now = datetime.datetime.utcnow()
+
+    existing_sub = db.query(UserSubscription).filter(
+        UserSubscription.user_id == tx.user_id
+    ).order_by(UserSubscription.created_at.desc()).first()
+
+    if existing_sub and existing_sub.status == "ACTIVE" and existing_sub.end_date and existing_sub.end_date > now:
+        existing_sub.end_date = existing_sub.end_date + datetime.timedelta(days=duration_days)
+        existing_sub.plan_id = tx.plan_id
+        existing_sub.payment_method = tx.provider
+        existing_sub.transaction_reference = tx.transaction_ref
+    else:
+        new_sub = UserSubscription(
+            id=str(uuid.uuid4()),
+            user_id=tx.user_id,
+            plan_id=tx.plan_id,
+            status="ACTIVE",
+            payment_method=tx.provider,
+            start_date=now,
+            end_date=now + datetime.timedelta(days=duration_days),
+            transaction_reference=tx.transaction_ref,
+            auto_renew=True
+        )
+        db.add(new_sub)
+    tx.status = "SUCCESS"
+    db.commit()
+
+# =========================================================================
+# ENDPOINTS OFFICIELS OPENPAY CONGO (MTN MOMO & AIRTEL MONEY)
+# =========================================================================
+
+@router.post(
+    "/openpay/initiate",
+    dependencies=[Depends(rate_limit(max_requests=8, window_seconds=60, action="openpay_initiate"))]
+)
+async def initiate_openpay_payment(request: OpenPayInitiateRequest, db: Session = Depends(get_db)):
+    """
+    Initie une transaction Mobile Money officielle via la passerelle OpenPay Congo.
+    Déclenche le push USSD sur le téléphone client (MTN *105# ou Airtel *128#).
+    """
+    clean_phone = openpay_client.format_phone_number(request.phone_number)
+    if len(clean_phone) < 9:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Numéro de téléphone congolais invalide."
+        )
+
+    payer = _get_or_create_payer_user(db, request.user_id, clean_phone, request.customer_name)
+    provider_code = openpay_client.resolve_provider(request.method, clean_phone)
+
+    # Appel vers l'API OpenPay Congo
+    openpay_resp = await openpay_client.initiate_payment(
+        phone_number=clean_phone,
+        amount_fcfa=request.amount_fcfa,
+        provider=provider_code,
+        metadata={
+            "user_id": payer.id,
+            "plan_id": request.plan_id,
+            "billing_cycle": request.billing_cycle,
+            "customer_name": request.customer_name or payer.full_name,
+        }
+    )
+
+    tx_id = f"tx_{uuid.uuid4().hex[:12]}"
+    ref_code = openpay_resp.get("reference") or f"OP-{datetime.datetime.utcnow().strftime('%M%S%f')[:8]}"
+
+    try:
+        new_tx = PaymentTransaction(
+            id=tx_id,
+            user_id=payer.id,
+            plan_id=request.plan_id,
+            amount=float(request.amount_fcfa),
+            currency="XAF",
+            provider=request.method,
+            phone_number=clean_phone,
+            status="PENDING",
+            transaction_ref=ref_code,
+            provider_transaction_id=openpay_resp.get("reference") or f"OP-{ref_code}"
+        )
+        db.add(new_tx)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+
+    ussd_msg = openpay_resp.get("ussd_instruction") or (
+        f"Un message USSD a été envoyé au {clean_phone}. "
+        f"Composez {'*105#' if provider_code == 'MTN' else '*128#'} pour approuver le débit de {request.amount_fcfa:,} FCFA."
+    )
+
+    return {
+        "success": openpay_resp.get("success", True),
+        "transaction_id": tx_id,
+        "reference_code": ref_code,
+        "reference": ref_code,
+        "status": "PENDING",
+        "amount_fcfa": request.amount_fcfa,
+        "operator": "MTN MoMo Congo" if provider_code == "MTN" else "Airtel Money Congo",
+        "ussd_instruction": ussd_msg,
+        "mode": openpay_resp.get("mode", "LIVE"),
+        "raw": openpay_resp.get("raw", {})
+    }
+
+@router.get("/openpay/check/{reference_id}")
+async def check_openpay_payment_status(reference_id: str, db: Session = Depends(get_db)):
+    """
+    Vérifie le statut en direct auprès de l'API OpenPay et active automatiquement l'abonnement en cas de succès.
+    """
+    tx = db.query(PaymentTransaction).filter(
+        (PaymentTransaction.id == reference_id) | (PaymentTransaction.transaction_ref == reference_id)
+    ).first()
+
+    openpay_status = await openpay_client.check_transaction_status(reference_id)
+    is_success = openpay_status.get("is_successful", False)
+
+    if is_success and tx and tx.status != "SUCCESS":
+        _activate_subscription_for_tx(db, tx)
+
+    status_str = "SUCCESS" if is_success else (tx.status if tx else openpay_status.get("status", "PENDING"))
+
+    return {
+        "success": True,
+        "reference": reference_id,
+        "status": status_str,
+        "is_successful": (status_str == "SUCCESS"),
+        "transaction_id": tx.id if tx else reference_id,
+        "amount": tx.amount if tx else None,
+        "currency": tx.currency if tx else "XAF",
+        "message": "Paiement validé avec succès !" if status_str == "SUCCESS" else "En attente de validation par l'utilisateur."
+    }
+
+# =========================================================================
+# ROUTE COMPATIBLE MOMO (AVEC DÉLÉGATION AUTOMATIQUE VERS OPENPAY)
+# =========================================================================
 
 @router.post(
     "/momo/initiate",
@@ -111,36 +336,41 @@ from ..services.momo_direct import mtn_momo_client, airtel_money_client
 )
 async def initiate_momo_payment(request: MomoInitiateRequest, db: Session = Depends(get_db)):
     """
-    Initie une transaction Mobile Money (MTN MoMo ou Airtel Money) avec notification push USSD direct.
+    Initie une transaction Mobile Money avec priorité à la passerelle OpenPay.
     """
-    # Sanitize phone number & basic validation
-    clean_phone = request.phone_number.strip().replace(" ", "").replace("-", "")
+    clean_phone = openpay_client.format_phone_number(request.phone_number)
     if len(clean_phone) < 8:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Numéro de téléphone invalide."
         )
 
-    tx_id = f"tx_{uuid.uuid4().hex[:12]}"
-    ref_code = f"MOMO-{datetime.datetime.utcnow().strftime('%M%S%f')[:8]}"
-    
-    operator_name = "MTN MoMo Congo" if request.method == "MTN_MOMO" else ("Airtel Money Congo" if request.method == "AIRTEL_MONEY" else "Carte Bancaire")
+    payer = _get_or_create_payer_user(db, request.user_id, clean_phone)
+    provider_code = openpay_client.resolve_provider(request.method, clean_phone)
+    operator_name = "MTN MoMo Congo" if provider_code == "MTN" else ("Airtel Money Congo" if provider_code == "AIRTEL" else "Carte Bancaire")
 
-    # Appel direct vers l'API de l'opérateur Mobile Money correspondant
-    if request.method == "MTN_MOMO":
-        res = await mtn_momo_client.request_to_pay(clean_phone, request.amount_fcfa, ref_code)
-        ussd_instruction = res.get("ussd_instruction", f"Composez *105# sur votre téléphone {clean_phone} pour valider le débit.")
-    elif request.method == "AIRTEL_MONEY":
-        res = await airtel_money_client.request_to_pay(clean_phone, request.amount_fcfa, ref_code)
-        ussd_instruction = res.get("ussd_instruction", f"Composez *128# sur votre téléphone Airtel {clean_phone} pour valider le débit.")
+    # Si OpenPay est configuré, on l'utilise directement
+    if openpay_client.is_configured:
+        op_resp = await openpay_client.initiate_payment(
+            phone_number=clean_phone,
+            amount_fcfa=request.amount_fcfa,
+            provider=provider_code,
+            metadata={"user_id": payer.id, "plan_id": request.plan_id}
+        )
+        tx_id = f"tx_{uuid.uuid4().hex[:12]}"
+        ref_code = op_resp.get("reference") or f"OP-{datetime.datetime.utcnow().strftime('%M%S%f')[:8]}"
+        ussd_instruction = op_resp.get("ussd_instruction") or f"Composez {'*105#' if provider_code == 'MTN' else '*128#'} pour valider."
     else:
-        ussd_instruction = "Redirection vers le système sécurisé de carte bancaire."
+        # Fallback simulation
+        tx_id = f"tx_{uuid.uuid4().hex[:12]}"
+        ref_code = f"MOMO-{datetime.datetime.utcnow().strftime('%M%S%f')[:8]}"
+        ussd_instruction = f"Composez {'*105#' if provider_code == 'MTN' else '*128#'} sur votre téléphone {clean_phone} pour valider le débit de {request.amount_fcfa:,} FCFA."
 
     # Save transaction in DB
     try:
         new_tx = PaymentTransaction(
             id=tx_id,
-            user_id=request.user_id or "anonymous_family",
+            user_id=payer.id,
             plan_id=request.plan_id,
             amount=float(request.amount_fcfa),
             currency="XAF",
@@ -152,7 +382,7 @@ async def initiate_momo_payment(request: MomoInitiateRequest, db: Session = Depe
         )
         db.add(new_tx)
         db.commit()
-    except Exception as e:
+    except Exception:
         db.rollback()
 
     return MomoInitiateResponse(
@@ -171,7 +401,6 @@ def verify_payment(transaction_id: str, db: Session = Depends(get_db)):
     """
     tx = db.query(PaymentTransaction).filter(PaymentTransaction.id == transaction_id).first()
     if not tx:
-        # Check by transaction reference if not found by primary ID
         tx = db.query(PaymentTransaction).filter(PaymentTransaction.transaction_ref == transaction_id).first()
 
     if not tx:
@@ -199,9 +428,8 @@ def momo_webhook(
     db: Session = Depends(get_db)
 ):
     """
-    Webhook sécurisé pour la réception des callbacks instantanés des passerelles MTN MoMo et Airtel Money.
+    Webhook sécurisé pour la réception des callbacks instantanés des passerelles (OpenPay, MTN MoMo, Airtel).
     """
-    # In production, verify secret or signature header
     if settings.ENVIRONMENT == "production":
         expected_secret = settings.WEBHOOK_SECRET
         if not x_signature or (x_signature != expected_secret and x_signature != f"sha256={expected_secret}"):
@@ -210,16 +438,19 @@ def momo_webhook(
                 detail="Signature de webhook invalide."
             )
 
-    tx_ref = payload.get("transaction_ref") or payload.get("reference") or payload.get("tx_id")
-    event_status = payload.get("status", "SUCCESS").upper()
+    tx_ref = payload.get("transaction_ref") or payload.get("reference") or payload.get("tx_id") or payload.get("id")
+    event_status = (payload.get("status") or "SUCCESS").upper()
 
     if tx_ref:
         tx = db.query(PaymentTransaction).filter(
             (PaymentTransaction.id == tx_ref) | (PaymentTransaction.transaction_ref == tx_ref)
         ).first()
         if tx:
-            tx.status = "SUCCESS" if event_status in ["SUCCESS", "PAID", "COMPLETED"] else "FAILED"
-            db.commit()
+            if event_status in ["SUCCESS", "PAID", "COMPLETED", "SUCCESSFUL"]:
+                _activate_subscription_for_tx(db, tx)
+            else:
+                tx.status = "FAILED"
+                db.commit()
 
     return {"status": "ACK", "provider": provider, "processed": True}
 
@@ -644,24 +875,45 @@ class OpenPayInitiateRequest(BaseModel):
 @router.post("/openpay/initiate")
 async def initiate_openpay_payment(
     request: OpenPayInitiateRequest,
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Initie un paiement Mobile Money réel via OpenPay Congo (MTN MoMo ou Airtel Money).
+    Relie systématiquement la transaction à l'utilisateur authentifié.
     """
+    # 1. Résolution de l'utilisateur connecté
+    user_id = (current_user.id if current_user else request.user_id)
+    if not user_id or user_id in ("anonymous", "anonymous_family"):
+        if settings.ENVIRONMENT == "production":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Veuillez vous connecter pour associer votre abonnement à votre compte."
+            )
+        parent = db.query(User).filter(User.role == "PARENT").first()
+        user_id = parent.id if parent else "dev_parent_user"
+
+    # 2. Normalisation exacte de l'identifiant du forfait en base
+    is_yearly = request.billing_cycle in ("yearly", "annual", "ANNUAL")
+    clean_plan_id = request.plan_id
+    if clean_plan_id in ("plan_family", "FAMILY"):
+        clean_plan_id = "plan_family_annual" if is_yearly else "plan_family_monthly"
+    elif clean_plan_id in ("plan_clan", "CLAN_DIASPORA", "CLAN"):
+        clean_plan_id = "plan_clan_annual" if is_yearly else "plan_clan_monthly"
+
     clean_phone = openpay_client.format_phone_number(request.phone_number)
     provider_code = openpay_client.resolve_provider(request.method, clean_phone)
 
-    # Appel au client OpenPay
+    # 3. Appel au client OpenPay
     openpay_res = await openpay_client.initiate_payment(
         phone_number=clean_phone,
         amount_fcfa=request.amount_fcfa,
         provider=provider_code,
         metadata={
-            "plan_id": request.plan_id,
+            "plan_id": clean_plan_id,
             "tier": request.tier,
             "billing_cycle": request.billing_cycle,
-            "user_id": request.user_id or "anonymous",
+            "user_id": user_id,
             "app": "mwana-lari"
         }
     )
@@ -676,12 +928,12 @@ async def initiate_openpay_payment(
     ref_code = openpay_res.get("reference") or f"OP-{uuid.uuid4().hex[:8].upper()}"
     tx_id = f"tx_op_{uuid.uuid4().hex[:12]}"
 
-    # Enregistrement de la transaction en base de données
+    # 4. Enregistrement de la transaction en base avec statut PENDING
     try:
         new_tx = PaymentTransaction(
             id=tx_id,
-            user_id=request.user_id or "anonymous_family",
-            plan_id=request.plan_id,
+            user_id=user_id,
+            plan_id=clean_plan_id,
             amount=float(request.amount_fcfa),
             currency="XAF",
             provider=f"OPENPAY_{provider_code}",
@@ -705,6 +957,7 @@ async def initiate_openpay_payment(
         "operator": operator_label,
         "provider": provider_code,
         "phone_number": clean_phone,
+        "plan_id": clean_plan_id,
         "ussd_instruction": openpay_res.get(
             "ussd_instruction",
             f"Veuillez composer votre code secret sur votre téléphone {clean_phone} pour valider le paiement de {request.amount_fcfa:,} FCFA."
@@ -719,13 +972,13 @@ async def check_openpay_status(
 ):
     """
     Vérifie le statut d'une transaction directement auprès de l'API OpenPay Congo.
-    Endpoint OpenPay: GET /v1/transaction/status/:referenceId
+    Si le paiement est confirmé, active/renouvelle l'abonnement dans user_subscriptions.
     """
     # 1. Vérification auprès d'OpenPay
     check_result = await openpay_client.check_transaction_status(reference_id)
     is_success = check_result.get("is_successful", False) or check_result.get("status") in ("success", "paid", "completed")
 
-    # 2. Mise à jour de la transaction locale
+    # 2. Recherche de la transaction locale
     tx = db.query(PaymentTransaction).filter(
         (PaymentTransaction.transaction_ref == reference_id) | (PaymentTransaction.id == reference_id)
     ).first()
@@ -733,29 +986,37 @@ async def check_openpay_status(
     if tx:
         if is_success:
             tx.status = "SUCCESS"
-            db.commit()
 
-            # Activer automatiquement l'abonnement de l'utilisateur si identifié
+            # Activer ou renouveler l'abonnement de l'utilisateur
             if tx.user_id and tx.user_id != "anonymous_family":
+                now = datetime.datetime.utcnow()
+                is_annual = "annual" in (tx.plan_id or "").lower() or "yearly" in (tx.plan_id or "").lower()
+                duration_days = 365 if is_annual else 30
+
                 existing_sub = db.query(UserSubscription).filter(UserSubscription.user_id == tx.user_id).first()
-                duration_days = 365 if "annual" in (tx.plan_id or "").lower() or "yearly" in (tx.plan_id or "").lower() else 30
-                end_date = datetime.datetime.utcnow() + datetime.timedelta(days=duration_days)
+                base_date = max(now, existing_sub.end_date) if (existing_sub and existing_sub.end_date and existing_sub.end_date > now) else now
+                end_date = base_date + datetime.timedelta(days=duration_days)
 
                 if existing_sub:
                     existing_sub.status = "ACTIVE"
-                    existing_sub.end_date = end_date
                     existing_sub.plan_id = tx.plan_id
+                    existing_sub.end_date = end_date
+                    existing_sub.payment_method = tx.provider
+                    existing_sub.transaction_reference = tx.transaction_ref
                 else:
                     new_sub = UserSubscription(
                         user_id=tx.user_id,
                         plan_id=tx.plan_id,
                         status="ACTIVE",
                         payment_method=tx.provider,
+                        start_date=now,
                         end_date=end_date,
-                        transaction_reference=tx.transaction_ref
+                        transaction_reference=tx.transaction_ref,
+                        auto_renew=True
                     )
                     db.add(new_sub)
-                db.commit()
+
+            db.commit()
 
         elif check_result.get("is_failed", False):
             tx.status = "FAILED"
@@ -773,16 +1034,38 @@ async def check_openpay_status(
 @router.post("/openpay/webhook")
 async def openpay_webhook(
     payload: dict,
+    x_signature: Optional[str] = Header(None),
+    x_openpay_signature: Optional[str] = Header(None),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """
-    Callback URL officiel pour OpenPay Congo.
-    Reçoit les notifications HTTP POST envoyées en temps réel par OpenPay.
-    Doit impérativement retourner un code HTTP 200.
+    Callback URL sécurisé pour OpenPay Congo.
+    Vérifie l'authenticité de la requête et met à jour payment_transactions & user_subscriptions.
     """
-    ref = payload.get("reference")
+    # 1. Vérification de la signature / token en production
+    sig = x_signature or x_openpay_signature
+    auth_token = authorization.replace("Bearer ", "").strip() if authorization else None
+    
+    if settings.ENVIRONMENT == "production":
+        expected_secret = settings.WEBHOOK_SECRET
+        api_key = settings.OPENPAY_API_KEY
+        valid = False
+        if sig and (sig in (expected_secret, f"sha256={expected_secret}", api_key)):
+            valid = True
+        elif auth_token and (auth_token in (expected_secret, api_key)):
+            valid = True
+
+        if not valid:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Signature ou authentification du webhook OpenPay invalide."
+            )
+
+    ref = payload.get("reference") or payload.get("transaction_ref") or payload.get("id")
     event_status = (payload.get("status") or "").lower()
     is_success = event_status in ("success", "paid", "completed")
+    is_failed = event_status in ("failed", "canceled", "cancelled", "expired")
 
     if ref:
         tx = db.query(PaymentTransaction).filter(
@@ -790,32 +1073,46 @@ async def openpay_webhook(
         ).first()
 
         if tx:
-            tx.status = "SUCCESS" if is_success else "FAILED"
-            db.commit()
+            if is_success:
+                tx.status = "SUCCESS"
 
-            if is_success and tx.user_id and tx.user_id != "anonymous_family":
-                duration_days = 365 if "annual" in (tx.plan_id or "").lower() else 30
-                end_date = datetime.datetime.utcnow() + datetime.timedelta(days=duration_days)
-                existing_sub = db.query(UserSubscription).filter(UserSubscription.user_id == tx.user_id).first()
-                if existing_sub:
-                    existing_sub.status = "ACTIVE"
-                    existing_sub.end_date = end_date
-                else:
-                    new_sub = UserSubscription(
-                        user_id=tx.user_id,
-                        plan_id=tx.plan_id,
-                        status="ACTIVE",
-                        payment_method=tx.provider,
-                        end_date=end_date,
-                        transaction_reference=tx.transaction_ref
-                    )
-                    db.add(new_sub)
-                db.commit()
+                # Créer ou renouveler l'abonnement
+                if tx.user_id and tx.user_id != "anonymous_family":
+                    now = datetime.datetime.utcnow()
+                    is_annual = "annual" in (tx.plan_id or "").lower() or "yearly" in (tx.plan_id or "").lower()
+                    duration_days = 365 if is_annual else 30
+
+                    existing_sub = db.query(UserSubscription).filter(UserSubscription.user_id == tx.user_id).first()
+                    base_date = max(now, existing_sub.end_date) if (existing_sub and existing_sub.end_date and existing_sub.end_date > now) else now
+                    end_date = base_date + datetime.timedelta(days=duration_days)
+
+                    if existing_sub:
+                        existing_sub.status = "ACTIVE"
+                        existing_sub.plan_id = tx.plan_id
+                        existing_sub.end_date = end_date
+                        existing_sub.payment_method = tx.provider
+                        existing_sub.transaction_reference = tx.transaction_ref
+                    else:
+                        new_sub = UserSubscription(
+                            user_id=tx.user_id,
+                            plan_id=tx.plan_id,
+                            status="ACTIVE",
+                            payment_method=tx.provider,
+                            start_date=now,
+                            end_date=end_date,
+                            transaction_reference=tx.transaction_ref,
+                            auto_renew=True
+                        )
+                        db.add(new_sub)
+            elif is_failed:
+                tx.status = "FAILED"
+
+            db.commit()
 
     # OpenPay exige impérativement un code HTTP 200
     return {
         "status": "SUCCESS",
-        "message": "Callback OpenPay reçu et validé avec succès.",
+        "message": "Callback OpenPay validé et traité avec succès.",
         "received_reference": ref
     }
 
