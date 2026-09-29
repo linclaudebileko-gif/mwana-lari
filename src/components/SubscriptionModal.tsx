@@ -13,7 +13,10 @@ import {
   AlertCircle,
   Download,
   Loader2,
-  HeartHandshake
+  HeartHandshake,
+  ExternalLink,
+  Lock,
+  Globe
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { DEFAULT_PRICING_PLANS, paymentsAPI } from '../services/api';
@@ -46,6 +49,12 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   const [phoneNumber, setPhoneNumber] = useState<string>('06 ');
   const [countryPrefix, setCountryPrefix] = useState<string>('+242');
 
+  // Champs spécifiques pour paiement par Carte Bancaire
+  const [cardCustomerName, setCardCustomerName] = useState<string>('');
+  const [cardCustomerEmail, setCardCustomerEmail] = useState<string>('');
+  const [cardPhoneContact, setCardPhoneContact] = useState<string>('');
+  const [cardPaymentUrl, setCardPaymentUrl] = useState<string>('');
+
   // Checkout step: 'SELECTION' -> 'PROCESSING' -> 'SUCCESS'
   const [step, setStep] = useState<'SELECTION' | 'PROCESSING' | 'SUCCESS'>('SELECTION');
   const [countdown, setCountdown] = useState<number>(6);
@@ -53,9 +62,17 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   useEffect(() => {
+    if (user) {
+      if (!cardCustomerName && user.fullName) setCardCustomerName(user.fullName);
+      if (!cardCustomerEmail && user.email) setCardCustomerEmail(user.email);
+    }
+  }, [user]);
+
+  useEffect(() => {
     if (isOpen) {
       setStep('SELECTION');
       setErrorMessage('');
+      setCardPaymentUrl('');
       if (initialPlanTier && initialPlanTier !== 'FREE') {
         setSelectedTier(initialPlanTier);
       }
@@ -95,7 +112,15 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       return;
     }
 
-    if (paymentMethod !== 'VISA_MASTERCARD') {
+    const isCard = paymentMethod === 'VISA_MASTERCARD';
+
+    if (isCard) {
+      const emailToUse = (cardCustomerEmail || user.email || '').trim();
+      if (!emailToUse || !emailToUse.includes('@')) {
+        setErrorMessage('Veuillez saisir une adresse email valide pour recevoir la confirmation et le reçu bancaire.');
+        return;
+      }
+    } else {
       const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
       if (cleanPhone.length < 8) {
         setErrorMessage('Veuillez saisir un numéro de téléphone valide (ex: 06 123 45 67).');
@@ -105,7 +130,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 
     playCardFlip();
     setStep('PROCESSING');
-    setCountdown(10);
+    setCountdown(isCard ? 5 : 10);
 
     try {
       const isYearly = billingCycle === 'yearly';
@@ -121,16 +146,16 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
         tier: selectedTier as 'FAMILY' | 'CLAN_DIASPORA',
         billingCycle,
         method: paymentMethod,
-        phoneNumber: `${countryPrefix} ${phoneNumber}`,
+        phoneNumber: isCard ? (cardPhoneContact.trim() || '') : `${countryPrefix} ${phoneNumber}`,
         amountFcfa: currentPriceFcfa,
         userId: user?.id,
-        customerName: user?.fullName || 'Parent',
-        customerEmail: user?.email || 'contact@mwanalari.cg',
+        customerName: (isCard ? (cardCustomerName.trim() || user?.fullName) : user?.fullName) || 'Parent',
+        customerEmail: (isCard ? (cardCustomerEmail.trim() || user?.email) : user?.email) || 'contact@mwanalari.cg',
       });
 
       if (resp && ((resp as any).success === false || (resp as any).status === 'FAILED')) {
-        const errorMsg = (resp as any).message || (resp as any).error || 'La transaction a été rejetée par l\'opérateur.';
-        setErrorMessage(`Échec opérateur (${paymentMethod === 'MTN_MOMO' ? 'MTN MoMo' : 'Airtel Money'}) : ${errorMsg}`);
+        const errorMsg = (resp as any).message || (resp as any).error || 'La transaction a été rejetée.';
+        setErrorMessage(`Échec (${isCard ? 'Paiement Carte' : (paymentMethod === 'MTN_MOMO' ? 'MTN MoMo' : 'Airtel Money')}) : ${errorMsg}`);
         setStep('SELECTION');
         return;
       }
@@ -140,7 +165,20 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       setCurrentTxId(txId);
       setTransactionRef(refCode);
 
-      // Compte à rebours indicatif (n'active PAS automatiquement l'abonnement)
+      const returnedUrl = (resp as any)?.payment_url || (resp as any)?.checkout_url || (resp as any)?.url;
+      if (returnedUrl) {
+        setCardPaymentUrl(returnedUrl);
+        // Pour les cartes, redirection fluide vers le guichet sécurisé
+        if (isCard) {
+          setTimeout(() => {
+            try {
+              window.open(returnedUrl, '_blank');
+            } catch {}
+          }, 800);
+        }
+      }
+
+      // Compte à rebours indicatif
       const interval = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -151,7 +189,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
         });
       }, 1000);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Erreur lors de l\'initiation du paiement OpenPay.');
+      setErrorMessage(err.message || 'Erreur lors de l\'initiation du paiement.');
       setStep('SELECTION');
     }
   };
@@ -178,9 +216,9 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
           txList.unshift({
             id: currentTxId || checkTarget,
             reference: operatorSmsRef.trim() || transactionRef || checkTarget,
-            userFullName: user?.fullName || 'Abonné Mobile',
-            userEmail: user?.email || 'parent@mwanalari.cg',
-            phoneNumber: `${countryPrefix} ${phoneNumber}`,
+            userFullName: (paymentMethod === 'VISA_MASTERCARD' ? cardCustomerName : user?.fullName) || 'Abonné Mwana Lari',
+            userEmail: (paymentMethod === 'VISA_MASTERCARD' ? cardCustomerEmail : user?.email) || 'parent@mwanalari.cg',
+            phoneNumber: paymentMethod === 'VISA_MASTERCARD' ? (cardPhoneContact || 'Carte Bancaire') : `${countryPrefix} ${phoneNumber}`,
             amountFcfa: currentPriceFcfa,
             planTier: selectedTier,
             provider: paymentMethod,
@@ -194,7 +232,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
           planName: selectedPlan.name,
           billingCycle,
           paymentMethod,
-          phoneNumber: `${countryPrefix} ${phoneNumber}`,
+          phoneNumber: paymentMethod === 'VISA_MASTERCARD' ? (cardPhoneContact || 'Carte Bancaire') : `${countryPrefix} ${phoneNumber}`,
         });
         playSuccessChime();
         setStep('SUCCESS');
@@ -204,21 +242,25 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 
       if (res && (res.status === 'FAILED' || res.is_failed === true || res.status === 'CANCELLED')) {
         setIsVerifying(false);
-        setVerifyStatusMessage("Le paiement a été refusé ou a expiré. Veuillez vous assurer d'avoir un solde suffisant et recommencer.");
+        setVerifyStatusMessage("Le paiement a été refusé ou a expiré. Veuillez vérifier votre solde ou plafond et recommencer.");
         return;
       }
 
-      // Si le statut est encore PENDING (le client n'a pas encore validé son code secret)
+      // Si le statut est encore PENDING
       setIsVerifying(false);
       const ussdCode = paymentMethod === 'MTN_MOMO' ? '*105#' : '*128#';
       setVerifyStatusMessage(
-        `Paiement en attente : vous n'avez pas encore validé le débit sur votre téléphone. Veuillez composer ${ussdCode} pour saisir votre code secret, puis cliquez à nouveau sur le bouton ci-dessous.`
+        paymentMethod === 'VISA_MASTERCARD'
+          ? "Paiement en attente : veuillez finaliser l'autorisation 3D-Secure auprès de votre banque sur la page sécurisée, puis cliquez à nouveau ci-dessous."
+          : `Paiement en attente : vous n'avez pas encore validé le débit sur votre téléphone. Veuillez composer ${ussdCode} pour saisir votre code secret, puis cliquez à nouveau sur le bouton ci-dessous.`
       );
     } catch (err: any) {
       setIsVerifying(false);
       const ussdCode = paymentMethod === 'MTN_MOMO' ? '*105#' : '*128#';
       setVerifyStatusMessage(
-        `Paiement en cours de traitement : composez ${ussdCode} sur votre téléphone pour valider avec votre code secret, puis réessayez.`
+        paymentMethod === 'VISA_MASTERCARD'
+          ? "Paiement par carte en cours de validation : veuillez patienter quelques instants puis réessayer."
+          : `Paiement en cours de traitement : composez ${ussdCode} sur votre téléphone pour valider avec votre code secret, puis réessayez.`
       );
     }
   };
@@ -437,7 +479,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                   </button>
                 </div>
 
-                {/* Mobile Money Phone Input Form */}
+                {/* Formulaire de paiement Mobile Money ou Carte Bancaire */}
                 {paymentMethod !== 'VISA_MASTERCARD' ? (
                   <div className="space-y-2 pt-2">
                     <label className="block text-xs font-bold text-savanna-900">
@@ -461,13 +503,67 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                     </p>
                   </div>
                 ) : (
-                  <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-950 space-y-1">
-                    <div className="font-bold flex items-center gap-1.5">
-                      <CreditCard className="w-4 h-4 text-blue-600" />
-                      <span>Paiement international par Carte Bancaire</span>
+                  <div className="space-y-3 pt-2">
+                    <div className="p-3.5 rounded-2xl bg-blue-50 border-2 border-blue-200 text-xs text-blue-950 space-y-1.5 shadow-sm">
+                      <div className="font-extrabold flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-blue-950">
+                          <CreditCard className="w-4 h-4 text-blue-600" />
+                          <span>Paiement par Carte Bancaire (Visa, Mastercard, GIMAC)</span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full bg-blue-200 text-blue-950 font-black text-[10px] tracking-wide">
+                          3D-Secure 2.0
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-blue-900 font-medium leading-relaxed">
+                        Idéal pour les cartes bancaires locales (BSCA, LCB, Ecobank, BGFIBank...) et la diaspora internationale.
+                        Montant : <strong>{currentPriceFcfa.toLocaleString()} FCFA</strong> (soit env. <strong>{currentPriceEur} €</strong>).
+                      </p>
                     </div>
-                    <p className="text-[11px] text-blue-900">
-                      Idéal pour les parents de la diaspora congolaise (Europe, Amérique, Afrique). Montant converti automatiquement : <strong>{currentPriceEur} €</strong>.
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] font-bold text-savanna-900 mb-1">
+                          Nom & Prénom sur la carte :
+                        </label>
+                        <input
+                          type="text"
+                          value={cardCustomerName}
+                          onChange={(e) => setCardCustomerName(e.target.value)}
+                          placeholder={user?.fullName || "Ex: Patrick Moukoko"}
+                          className="w-full px-3.5 py-2.5 rounded-xl border-2 border-savanna-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 outline-none text-xs font-bold text-savanna-950 bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-savanna-900 mb-1">
+                          Email pour le reçu bancaire :
+                        </label>
+                        <input
+                          type="email"
+                          value={cardCustomerEmail}
+                          onChange={(e) => setCardCustomerEmail(e.target.value)}
+                          placeholder={user?.email || "parent@famille.cg"}
+                          className="w-full px-3.5 py-2.5 rounded-xl border-2 border-savanna-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 outline-none text-xs font-bold text-savanna-950 bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-savanna-800 mb-1">
+                        Numéro de téléphone WhatsApp (Optionnel pour notification) :
+                      </label>
+                      <input
+                        type="tel"
+                        value={cardPhoneContact}
+                        onChange={(e) => setCardPhoneContact(e.target.value)}
+                        placeholder="+242 06 ... ou +33 6 ... (International accepté)"
+                        className="w-full px-3.5 py-2 rounded-xl border-2 border-savanna-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 outline-none text-xs font-medium text-savanna-950 bg-white"
+                      />
+                    </div>
+
+                    <p className="text-[11px] text-savanna-700 font-medium flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-forest-600 flex-shrink-0" />
+                      <span>Redirection automatique vers la passerelle sécurisée OpenPay. Aucune donnée de carte n'est stockée sur nos serveurs.</span>
                     </p>
                   </div>
                 )}
@@ -489,13 +585,21 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                 >
                   <Zap className="w-5 h-5 text-amber-200 fill-amber-200 animate-bounce" />
                   <span>
-                    Payer via OpenPay ({currentPriceFcfa.toLocaleString()} FCFA / {billingCycle === 'yearly' ? 'an' : 'mois'})
+                    {paymentMethod === 'VISA_MASTERCARD'
+                      ? `Payer par Carte Bancaire (${currentPriceFcfa.toLocaleString()} FCFA • env. ${currentPriceEur} €)`
+                      : `Payer via OpenPay (${currentPriceFcfa.toLocaleString()} FCFA / ${billingCycle === 'yearly' ? 'an' : 'mois'})`
+                    }
                   </span>
                   <ArrowRight className="w-5 h-5" />
                 </button>
                 <p className="text-center text-[11px] text-savanna-700 font-medium mt-2 flex items-center justify-center gap-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 text-forest-600" />
-                  <span>Guichet sécurisé <strong>OpenPay Congo</strong> • MTN MoMo • Airtel Money • Validation instantanée</span>
+                  <span>
+                    {paymentMethod === 'VISA_MASTERCARD'
+                      ? 'Guichet bancaire sécurisé OpenPay • Chiffrement SSL 256 bits • 3D-Secure 2.0'
+                      : 'Guichet sécurisé OpenPay Congo • MTN MoMo • Airtel Money • Validation instantanée'
+                    }
+                  </span>
                 </p>
                 <p className="text-center text-[11px] text-savanna-700 font-medium mt-1">
                   Sans engagement • Annulable à tout moment • Facture numérique avec TVA incluse
@@ -504,117 +608,261 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             </>
           )}
 
-          {/* Step 2: Push Notification Pending Countdown */}
+          {/* Step 2: Push Notification Pending Countdown / Card Processing */}
           {step === 'PROCESSING' && (
-            <div className="text-center py-6 px-4 space-y-5 animate-fadeIn">
-              <div className="relative inline-block">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-brand-500 to-amber-400 flex items-center justify-center text-white text-3xl shadow-xl mx-auto animate-pulse">
-                  📱
+            paymentMethod === 'VISA_MASTERCARD' ? (
+              <div className="text-center py-6 px-4 space-y-5 animate-fadeIn">
+                <div className="relative inline-block">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-500 to-brand-500 flex items-center justify-center text-white text-3xl shadow-xl mx-auto animate-pulse">
+                    💳
+                  </div>
+                  {countdown > 0 && (
+                    <div className="absolute -top-1 -right-1 w-8 h-8 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center border-2 border-white shadow-md">
+                      {countdown}s
+                    </div>
+                  )}
                 </div>
-                {countdown > 0 && (
-                  <div className="absolute -top-1 -right-1 w-8 h-8 rounded-full bg-forest-500 text-white font-black text-xs flex items-center justify-center border-2 border-white shadow-md">
-                    {countdown}s
+
+                <div className="space-y-1.5">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100 text-blue-900 text-xs font-black uppercase tracking-wider">
+                    <ShieldCheck className="w-4 h-4 text-blue-700" />
+                    <span>Guichet Carte Sécurisé OpenPay</span>
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-black text-savanna-950">
+                    Validation du Paiement par Carte
+                  </h3>
+                  <p className="text-xs sm:text-sm text-savanna-800 font-medium max-w-md mx-auto">
+                    Titulaire : <strong>{cardCustomerName || user?.fullName || 'Parent'}</strong> • Montant : <strong>{currentPriceFcfa.toLocaleString()} FCFA</strong> (~{currentPriceEur} €)
+                  </p>
+                </div>
+
+                {/* Card Instructions / Redirect box */}
+                <div className="bg-blue-50/80 border-2 border-blue-200 rounded-3xl p-4 sm:p-5 max-w-md mx-auto text-left space-y-3 shadow-md">
+                  <div className="font-extrabold text-xs text-blue-950 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Lock className="w-4 h-4 text-blue-600" />
+                      <span>Processus sécurisé (Visa / Mastercard) :</span>
+                    </span>
+                    <span className="text-[10px] font-black text-blue-800 bg-blue-200 px-2.5 py-0.5 rounded-full">
+                      Réf: {transactionRef}
+                    </span>
+                  </div>
+
+                  <ol className="list-decimal pl-5 space-y-2 text-xs text-blue-900 font-medium">
+                    <li>
+                      Cliquez sur le bouton bleu ci-dessous pour <strong>ouvrir la page de saisie sécurisée</strong> si elle ne s'est pas ouverte automatiquement.
+                    </li>
+                    <li>
+                      Entrez les 16 chiffres de votre carte, date d'expiration et cryptogramme visuel (CVV).
+                    </li>
+                    <li>
+                      Validez l'authentification <strong>3D-Secure</strong> envoyée par votre banque (SMS ou notification bancaire).
+                    </li>
+                    <li>
+                      Revenez ici et cliquez sur <strong>"Activer mon forfait"</strong>.
+                    </li>
+                  </ol>
+
+                  {cardPaymentUrl && (
+                    <div className="pt-2">
+                      <a
+                        href={cardPaymentUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] active:scale-95"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        <span>Ouvrir la page de paiement par carte sécurisée</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* Optional Bank Transaction Ref input */}
+                <div className="max-w-md mx-auto text-left space-y-1.5">
+                  <label className="block text-xs font-bold text-savanna-800">
+                    Référence de transaction ou reçu bancaire (Optionnel) :
+                  </label>
+                  <input
+                    type="text"
+                    value={operatorSmsRef}
+                    onChange={(e) => setOperatorSmsRef(e.target.value)}
+                    placeholder="Ex: OP-123456 ou code bancaire"
+                    className="w-full px-3.5 py-2 rounded-xl border-2 border-savanna-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 outline-none text-xs font-bold text-savanna-950 bg-white"
+                  />
+                </div>
+
+                {/* Verification Feedback Message */}
+                {verifyStatusMessage && (
+                  <div className="bg-terracotta-50 border-2 border-terracotta-300 rounded-2xl p-3.5 max-w-md mx-auto text-xs text-terracotta-950 font-bold flex items-start gap-2 text-left animate-shake">
+                    <AlertCircle className="w-4 h-4 text-terracotta-600 flex-shrink-0 mt-0.5" />
+                    <span>{verifyStatusMessage}</span>
                   </div>
                 )}
-              </div>
 
-              <div className="space-y-2">
-                <h3 className="text-xl sm:text-2xl font-black text-savanna-950">
-                  Validation du paiement {paymentMethod === 'MTN_MOMO' ? 'MTN MoMo' : 'Airtel Money'}
-                </h3>
-                <p className="text-xs sm:text-sm text-savanna-800 font-medium max-w-md mx-auto">
-                  Demande enregistrée pour le numéro <strong>{countryPrefix} {phoneNumber}</strong> • Montant : <strong>{currentPriceFcfa.toLocaleString()} FCFA</strong>
-                </p>
-              </div>
-
-              {/* Instructions Box */}
-              <div className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-4 sm:p-5 max-w-md mx-auto text-left space-y-3 shadow-md">
-                <div className="font-extrabold text-xs text-amber-950 flex items-center gap-2">
-                  <Smartphone className="w-4 h-4 text-amber-700" />
-                  <span>Comment valider sur votre téléphone :</span>
-                </div>
-                <ol className="list-decimal pl-5 space-y-2 text-xs text-amber-900 font-medium">
-                  <li>
-                    Si le message de confirmation automatique ne s'affiche pas sur votre écran, <strong>composez directement sur votre téléphone</strong> :
-                    <div className="mt-1.5 p-2 rounded-xl bg-white border border-amber-300 font-black text-xs text-amber-950 flex items-center justify-between">
-                      <span>Code USSD :</span>
-                      <span className="px-2.5 py-0.5 rounded-lg bg-amber-200 text-amber-950 text-sm font-black tracking-wide">
-                        {paymentMethod === 'MTN_MOMO' ? '*105#' : '*128#'}
-                      </span>
-                    </div>
-                  </li>
-                  <li>
-                    Entrez votre <strong>Code PIN Secret</strong> et approuvez le débit de <strong>{currentPriceFcfa.toLocaleString()} FCFA</strong>.
-                  </li>
-                  <li>
-                    Une fois confirmé, cliquez sur le bouton vert ci-dessous pour <strong>activer immédiatement</strong> vos accès !
-                  </li>
-                </ol>
-              </div>
-
-              {/* Optional SMS Transaction ID input */}
-              <div className="max-w-md mx-auto text-left space-y-1.5">
-                <label className="block text-xs font-bold text-savanna-800">
-                  ID de transaction ou référence SMS (Optionnel) :
-                </label>
-                <input
-                  type="text"
-                  value={operatorSmsRef}
-                  onChange={(e) => setOperatorSmsRef(e.target.value)}
-                  placeholder="Ex: PP260917... ou Référence SMS opérateur"
-                  className="w-full px-3.5 py-2 rounded-xl border-2 border-savanna-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 outline-none text-xs font-bold text-savanna-950 bg-white"
-                />
-              </div>
-
-              {/* Verification Feedback Message */}
-              {verifyStatusMessage && (
-                <div className="bg-terracotta-50 border-2 border-terracotta-300 rounded-2xl p-3.5 max-w-md mx-auto text-xs text-terracotta-950 font-bold flex items-start gap-2 text-left animate-shake">
-                  <AlertCircle className="w-4 h-4 text-terracotta-600 flex-shrink-0 mt-0.5" />
-                  <span>{verifyStatusMessage}</span>
-                </div>
-              )}
-
-              {/* Action Buttons: Explicit Verification */}
-              <div className="space-y-3 max-w-md mx-auto pt-1">
-                <button
-                  type="button"
-                  onClick={handleVerifyPayment}
-                  disabled={isVerifying}
-                  className="w-full py-4 px-6 rounded-2xl bg-forest-600 hover:bg-forest-700 text-white font-black text-sm sm:text-base shadow-xl shadow-forest-600/30 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
-                >
-                  {isVerifying ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin text-white" />
-                      <span>Activation de votre abonnement en cours...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-5 h-5 text-emerald-200" />
-                      <span>J'ai validé mon code secret — Activer mon forfait</span>
-                    </>
-                  )}
-                </button>
-
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
+                {/* Action Buttons: Verification */}
+                <div className="space-y-3 max-w-md mx-auto pt-1">
                   <button
                     type="button"
-                    onClick={() => { setStep('SELECTION'); setVerifyStatusMessage(''); }}
-                    className="text-xs font-bold text-savanna-700 hover:text-savanna-950 underline"
+                    onClick={handleVerifyPayment}
+                    disabled={isVerifying}
+                    className="w-full py-4 px-6 rounded-2xl bg-forest-600 hover:bg-forest-700 text-white font-black text-sm sm:text-base shadow-xl shadow-forest-600/30 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
                   >
-                    ← Changer de numéro / forfait
+                    {isVerifying ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin text-white" />
+                        <span>Vérification de votre paiement par carte...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-5 h-5 text-emerald-200" />
+                        <span>J'ai validé ma carte — Activer mon forfait</span>
+                      </>
+                    )}
                   </button>
 
-                  <a
-                    href={`https://wa.me/242066001122?text=${encodeURIComponent(`Bonjour Mwana Lari, j'ai initié le paiement de mon abonnement ${selectedPlan.name} (${currentPriceFcfa} FCFA) au numéro ${countryPrefix} ${phoneNumber}. Réf: ${transactionRef}`)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] font-bold text-forest-700 hover:text-forest-800 bg-forest-50 hover:bg-forest-100 px-3 py-1.5 rounded-xl border border-forest-200 flex items-center gap-1.5"
-                  >
-                    <span>💬 Aide WhatsApp</span>
-                  </a>
+                  {/* Bouton de test démo en local */}
+                  {(typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname.includes('127.0.0.1'))) && (
+                    <button
+                      type="button"
+                      onClick={handleDemoConfirmAndVerify}
+                      className="w-full py-2.5 px-4 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 font-black text-xs border border-amber-300 transition-all"
+                    >
+                      ⚡ Simuler la validation carte bancaire (Mode Test)
+                    </button>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => { setStep('SELECTION'); setVerifyStatusMessage(''); }}
+                      className="text-xs font-bold text-savanna-700 hover:text-savanna-950 underline"
+                    >
+                      ← Changer de moyen de paiement
+                    </button>
+
+                    <a
+                      href={`https://wa.me/242066001122?text=${encodeURIComponent(`Bonjour Mwana Lari, j'ai initié un paiement par carte pour mon forfait ${selectedPlan.name} (${currentPriceFcfa} FCFA). Réf: ${transactionRef}`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-bold text-forest-700 hover:text-forest-800 bg-forest-50 hover:bg-forest-100 px-3 py-1.5 rounded-xl border border-forest-200 flex items-center gap-1.5"
+                    >
+                      <span>💬 Support WhatsApp</span>
+                    </a>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-6 px-4 space-y-5 animate-fadeIn">
+                <div className="relative inline-block">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-brand-500 to-amber-400 flex items-center justify-center text-white text-3xl shadow-xl mx-auto animate-pulse">
+                    📱
+                  </div>
+                  {countdown > 0 && (
+                    <div className="absolute -top-1 -right-1 w-8 h-8 rounded-full bg-forest-500 text-white font-black text-xs flex items-center justify-center border-2 border-white shadow-md">
+                      {countdown}s
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-xl sm:text-2xl font-black text-savanna-950">
+                    Validation du paiement {paymentMethod === 'MTN_MOMO' ? 'MTN MoMo' : 'Airtel Money'}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-savanna-800 font-medium max-w-md mx-auto">
+                    Demande enregistrée pour le numéro <strong>{countryPrefix} {phoneNumber}</strong> • Montant : <strong>{currentPriceFcfa.toLocaleString()} FCFA</strong>
+                  </p>
+                </div>
+
+                {/* Instructions Box */}
+                <div className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-4 sm:p-5 max-w-md mx-auto text-left space-y-3 shadow-md">
+                  <div className="font-extrabold text-xs text-amber-950 flex items-center gap-2">
+                    <Smartphone className="w-4 h-4 text-amber-700" />
+                    <span>Comment valider sur votre téléphone :</span>
+                  </div>
+                  <ol className="list-decimal pl-5 space-y-2 text-xs text-amber-900 font-medium">
+                    <li>
+                      Si le message de confirmation automatique ne s'affiche pas sur votre écran, <strong>composez directement sur votre téléphone</strong> :
+                      <div className="mt-1.5 p-2 rounded-xl bg-white border border-amber-300 font-black text-xs text-amber-950 flex items-center justify-between">
+                        <span>Code USSD :</span>
+                        <span className="px-2.5 py-0.5 rounded-lg bg-amber-200 text-amber-950 text-sm font-black tracking-wide">
+                          {paymentMethod === 'MTN_MOMO' ? '*105#' : '*128#'}
+                        </span>
+                      </div>
+                    </li>
+                    <li>
+                      Entrez votre <strong>Code PIN Secret</strong> et approuvez le débit de <strong>{currentPriceFcfa.toLocaleString()} FCFA</strong>.
+                    </li>
+                    <li>
+                      Une fois confirmé, cliquez sur le bouton vert ci-dessous pour <strong>activer immédiatement</strong> vos accès !
+                    </li>
+                  </ol>
+                </div>
+
+                {/* Optional SMS Transaction ID input */}
+                <div className="max-w-md mx-auto text-left space-y-1.5">
+                  <label className="block text-xs font-bold text-savanna-800">
+                    ID de transaction ou référence SMS (Optionnel) :
+                  </label>
+                  <input
+                    type="text"
+                    value={operatorSmsRef}
+                    onChange={(e) => setOperatorSmsRef(e.target.value)}
+                    placeholder="Ex: PP260917... ou Référence SMS opérateur"
+                    className="w-full px-3.5 py-2 rounded-xl border-2 border-savanna-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 outline-none text-xs font-bold text-savanna-950 bg-white"
+                  />
+                </div>
+
+                {/* Verification Feedback Message */}
+                {verifyStatusMessage && (
+                  <div className="bg-terracotta-50 border-2 border-terracotta-300 rounded-2xl p-3.5 max-w-md mx-auto text-xs text-terracotta-950 font-bold flex items-start gap-2 text-left animate-shake">
+                    <AlertCircle className="w-4 h-4 text-terracotta-600 flex-shrink-0 mt-0.5" />
+                    <span>{verifyStatusMessage}</span>
+                  </div>
+                )}
+
+                {/* Action Buttons: Explicit Verification */}
+                <div className="space-y-3 max-w-md mx-auto pt-1">
+                  <button
+                    type="button"
+                    onClick={handleVerifyPayment}
+                    disabled={isVerifying}
+                    className="w-full py-4 px-6 rounded-2xl bg-forest-600 hover:bg-forest-700 text-white font-black text-sm sm:text-base shadow-xl shadow-forest-600/30 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                  >
+                    {isVerifying ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin text-white" />
+                        <span>Activation de votre abonnement en cours...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-5 h-5 text-emerald-200" />
+                        <span>J'ai validé mon code secret — Activer mon forfait</span>
+                      </>
+                    )}
+                  </button>
+
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => { setStep('SELECTION'); setVerifyStatusMessage(''); }}
+                      className="text-xs font-bold text-savanna-700 hover:text-savanna-950 underline"
+                    >
+                      ← Changer de numéro / forfait
+                    </button>
+
+                    <a
+                      href={`https://wa.me/242066001122?text=${encodeURIComponent(`Bonjour Mwana Lari, j'ai initié le paiement de mon abonnement ${selectedPlan.name} (${currentPriceFcfa} FCFA) au numéro ${countryPrefix} ${phoneNumber}. Réf: ${transactionRef}`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-bold text-forest-700 hover:text-forest-800 bg-forest-50 hover:bg-forest-100 px-3 py-1.5 rounded-xl border border-forest-200 flex items-center gap-1.5"
+                    >
+                      <span>💬 Aide WhatsApp</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )
           )}
 
           {/* Step 3: Success Confirmation */}

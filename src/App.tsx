@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { INITIAL_CHILD_PROFILE, LARI_WORDS, CULTURAL_STORIES } from './data/mockData';
 import { UserRole, ChildProfile } from './types';
+import { LandingPage } from './components/LandingPage';
+import { AuthModal } from './components/AuthModal';
+import { SubscriptionModal } from './components/SubscriptionModal';
 import { Header } from './components/Header';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 import { Dashboard } from './components/Dashboard';
@@ -16,6 +19,8 @@ import { LessonModal } from './components/LessonModal';
 import { ParentalPinModal } from './components/ParentalPinModal';
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { LegalNoticeModal } from './components/LegalNoticeModal';
+import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import { NetworkStatusBanner } from './components/NetworkStatusBanner';
 import { BookOpen, Mic, Volume2, Users, GraduationCap, Sparkles, Gamepad2, Shield, Scale, ShieldCheck } from 'lucide-react';
 import { playSuccessChime } from './utils/audio';
 import { registerServiceWorker, isOnline as checkIsOnline, addNetworkStatusListener, syncPendingProgressWithBackend } from './utils/pwa';
@@ -30,22 +35,28 @@ import {
 } from './utils/offlineStorage';
 import { lessonsAPI } from './services/api';
 
-export type ActiveTab = 'dashboard' | 'audiolab' | 'games' | 'dictionary' | 'heritage' | 'family' | 'school' | 'admin';
+export type ActiveTab = 'landing' | 'dashboard' | 'audiolab' | 'games' | 'dictionary' | 'heritage' | 'family' | 'school' | 'admin';
 
 // Helper to get initial tab from URL hash (#dictionary) or query param (?tab=dictionary)
 const getInitialTab = (): ActiveTab => {
   if (typeof window !== 'undefined') {
     const hash = window.location.hash.replace('#', '').toLowerCase();
-    if (['dashboard', 'audiolab', 'games', 'dictionary', 'heritage', 'family', 'school', 'admin'].includes(hash)) {
+    if (['landing', 'dashboard', 'audiolab', 'games', 'dictionary', 'heritage', 'family', 'school', 'admin'].includes(hash)) {
       return hash as ActiveTab;
     }
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get('tab')?.toLowerCase();
-    if (tabParam && ['dashboard', 'audiolab', 'games', 'dictionary', 'heritage', 'family', 'school', 'admin'].includes(tabParam)) {
+    if (tabParam && ['landing', 'dashboard', 'audiolab', 'games', 'dictionary', 'heritage', 'family', 'school', 'admin'].includes(tabParam)) {
       return tabParam as ActiveTab;
     }
+    // If user already used app directly, go to dashboard
+    try {
+      if (localStorage.getItem('mwana_direct_app') === 'true') {
+        return 'dashboard';
+      }
+    } catch {}
   }
-  return 'dashboard';
+  return 'landing';
 };
 
 function MwanaLariApp() {
@@ -62,6 +73,9 @@ function MwanaLariApp() {
   const [pendingRoleTarget, setPendingRoleTarget] = useState<UserRole | null>(null);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState<boolean>(false);
   const [isLegalModalOpen, setIsLegalModalOpen] = useState<boolean>(false);
+  const [isPwaInstallModalOpen, setIsPwaInstallModalOpen] = useState<boolean>(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState<boolean>(false);
 
   const currentRole = customRole || activeRole;
 
@@ -75,11 +89,11 @@ function MwanaLariApp() {
     }
   }, [isAdmin, activeTab]);
 
-  // Listen to browser hash changes (e.g. #dictionary)
+  // Listen to browser hash changes (e.g. #dictionary or #landing)
   useEffect(() => {
     const handleHashChange = () => {
       const currentHash = window.location.hash.replace('#', '').toLowerCase();
-      if (['dashboard', 'audiolab', 'games', 'dictionary', 'heritage', 'family', 'school', 'admin'].includes(currentHash)) {
+      if (['landing', 'dashboard', 'audiolab', 'games', 'dictionary', 'heritage', 'family', 'school', 'admin'].includes(currentHash)) {
         if (currentHash === 'admin' && !isAdmin) {
           setActiveTab('dashboard');
           return;
@@ -152,6 +166,16 @@ function MwanaLariApp() {
   };
 
   const handleTabChange = (tab: ActiveTab) => {
+    if (tab === 'landing') {
+      setActiveTab('landing');
+      window.location.hash = 'landing';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    try {
+      localStorage.setItem('mwana_direct_app', 'true');
+    } catch {}
+
     if (tab === 'admin' && !isAdmin) {
       return;
     }
@@ -251,16 +275,8 @@ function MwanaLariApp() {
   return (
     <div className="min-h-screen flex flex-col bg-savanna-100">
       
-      {/* Header Bar with PWA & Backend API status & Updates center */}
-      <Header
-        profile={activeChild}
-        activeRole={currentRole}
-        onRoleChange={handleRoleChange}
-        isOnline={isOnline}
-        pendingSyncCount={pendingSyncCount}
-        onManualSync={handleManualSync}
-        isSyncing={isSyncing}
-      />
+      {/* Network & Offline Status Banner (Instant feedback for offline mode & sync) */}
+      <NetworkStatusBanner />
 
       {/* Auto-Update Notification Banner */}
       <UpdateNotificationBanner
@@ -268,183 +284,231 @@ function MwanaLariApp() {
         onDismiss={() => setIsUpdateAvailable(false)}
       />
 
-      {/* Navigation Tabs Subheader */}
-      <nav className="bg-white/90 border-b border-brand-300 backdrop-blur-md sticky top-[60px] sm:top-[69px] z-40 px-2 sm:px-4 py-1.5 sm:py-2 shadow-sm">
-        <div className="max-w-7xl mx-auto flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none touch-pan-x">
-          
-          <button
-            id="nav-tab-dashboard"
-            onClick={() => handleTabChange('dashboard')}
-            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
-              activeTab === 'dashboard'
-                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
-                : 'text-savanna-900 hover:bg-savanna-200/60'
-            }`}
-          >
-            <span>🌳</span>
-            <span>Académie & Parcours</span>
-          </button>
-
-          <button
-            id="nav-tab-audiolab"
-            onClick={() => handleTabChange('audiolab')}
-            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
-              activeTab === 'audiolab'
-                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
-                : 'text-savanna-900 hover:bg-savanna-200/60'
-            }`}
-          >
-            <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span>Studio Audio</span>
-          </button>
-
-          <button
-            id="nav-tab-games"
-            onClick={() => handleTabChange('games')}
-            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
-              activeTab === 'games'
-                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
-                : 'text-savanna-900 hover:bg-savanna-200/60'
-            }`}
-          >
-            <Gamepad2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
-            <span>Jeux de Koko (4)</span>
-          </button>
-
-          <button
-            id="nav-tab-dictionary"
-            onClick={() => handleTabChange('dictionary')}
-            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
-              activeTab === 'dictionary'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30 ring-2 ring-blue-300'
-                : 'text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200'
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
-            <span>Grand Dictionnaire (+500)</span>
-          </button>
-
-          <button
-            id="nav-tab-heritage"
-            onClick={() => handleTabChange('heritage')}
-            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
-              activeTab === 'heritage'
-                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
-                : 'text-savanna-900 hover:bg-savanna-200/60'
-            }`}
-          >
-            <span>👵</span>
-            <span>Voix des Aînés</span>
-          </button>
-
-          <button
-            id="nav-tab-family"
-            onClick={() => handleTabChange('family')}
-            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
-              activeTab === 'family'
-                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
-                : 'text-savanna-900 hover:bg-savanna-200/60'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span>Famille</span>
-          </button>
-
-          <button
-            id="nav-tab-school"
-            onClick={() => handleTabChange('school')}
-            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
-              activeTab === 'school'
-                ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
-                : 'text-savanna-900 hover:bg-savanna-200/60'
-            }`}
-          >
-            <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span>École</span>
-          </button>
-
-          {isAdmin && (
-            <button
-              id="nav-tab-admin"
-              onClick={() => handleTabChange('admin')}
-              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
-                activeTab === 'admin'
-                  ? 'bg-gradient-to-r from-brand-700 via-amber-600 to-terracotta-600 text-white shadow-md shadow-brand-500/30 ring-2 ring-amber-300'
-                  : 'text-brand-900 bg-brand-50/90 hover:bg-brand-100 border border-brand-300'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600" />
-              <span>Administration & Abonnements</span>
-            </button>
-          )}
-
-        </div>
-      </nav>
-
-      {/* Main Content View Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-2.5 sm:px-4 py-4 sm:py-6">
-        {activeTab === 'dashboard' && (
-          <Dashboard
+      {activeTab === 'landing' ? (
+        <LandingPage
+          onStartLearning={() => handleTabChange('dashboard')}
+          onNavigateTab={(tab) => handleTabChange(tab)}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
+          onOpenSubscription={() => setIsSubscriptionModalOpen(true)}
+          onOpenPwaModal={() => setIsPwaInstallModalOpen(true)}
+          onOpenPrivacy={() => setIsPrivacyModalOpen(true)}
+          onOpenLegal={() => setIsLegalModalOpen(true)}
+        />
+      ) : (
+        <>
+          {/* Header Bar with PWA & Backend API status & Updates center */}
+          <Header
             profile={activeChild}
-            onEarnXp={handleEarnXp}
-            onNavigate={(tab) => handleTabChange(tab as ActiveTab)}
+            activeRole={currentRole}
+            onRoleChange={handleRoleChange}
+            isOnline={isOnline}
+            pendingSyncCount={pendingSyncCount}
+            onManualSync={handleManualSync}
+            isSyncing={isSyncing}
+            onOpenInstallPrompt={() => setIsPwaInstallModalOpen(true)}
+            onLogoClick={() => handleTabChange('landing')}
           />
-        )}
 
-        {activeTab === 'audiolab' && <AudioLab />}
+          {/* Navigation Tabs Subheader */}
+          <nav className="bg-white/90 border-b border-brand-300 backdrop-blur-md sticky top-[60px] sm:top-[69px] z-40 px-2 sm:px-4 py-1.5 sm:py-2 shadow-sm">
+            <div className="max-w-7xl mx-auto flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none touch-pan-x">
+              
+              <button
+                id="nav-tab-landing"
+                onClick={() => handleTabChange('landing')}
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 text-brand-900 bg-amber-100/80 hover:bg-amber-200 border border-brand-300"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-brand-600" />
+                <span>Accueil / Site Vitrine</span>
+              </button>
 
-        {activeTab === 'games' && (
-          <KokoGames
-            onEarnXp={handleEarnXp}
-            onBackToDashboard={() => handleTabChange('dashboard')}
-          />
-        )}
+              <button
+                id="nav-tab-dashboard"
+                onClick={() => handleTabChange('dashboard')}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
+                  activeTab === 'dashboard'
+                    ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
+                    : 'text-savanna-900 hover:bg-savanna-200/60'
+                }`}
+              >
+                <span>🌳</span>
+                <span>Académie & Parcours</span>
+              </button>
 
-        {activeTab === 'dictionary' && <Dictionary />}
+              <button
+                id="nav-tab-audiolab"
+                onClick={() => handleTabChange('audiolab')}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
+                  activeTab === 'audiolab'
+                    ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
+                    : 'text-savanna-900 hover:bg-savanna-200/60'
+                }`}
+              >
+                <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span>Studio Audio</span>
+              </button>
 
-        {activeTab === 'heritage' && <BakuluHeritage />}
+              <button
+                id="nav-tab-games"
+                onClick={() => handleTabChange('games')}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
+                  activeTab === 'games'
+                    ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
+                    : 'text-savanna-900 hover:bg-savanna-200/60'
+                }`}
+              >
+                <Gamepad2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
+                <span>Jeux de Koko (4)</span>
+              </button>
 
-        {activeTab === 'family' && <FamilyChallenges />}
+              <button
+                id="nav-tab-dictionary"
+                onClick={() => handleTabChange('dictionary')}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
+                  activeTab === 'dictionary'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30 ring-2 ring-blue-300'
+                    : 'text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
+                <span>Grand Dictionnaire (+500)</span>
+              </button>
 
-        {activeTab === 'school' && <SchoolDashboard />}
+              <button
+                id="nav-tab-heritage"
+                onClick={() => handleTabChange('heritage')}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
+                  activeTab === 'heritage'
+                    ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
+                    : 'text-savanna-900 hover:bg-savanna-200/60'
+                }`}
+              >
+                <span>👵</span>
+                <span>Voix des Aînés</span>
+              </button>
 
-        {activeTab === 'admin' && isAdmin && <AdminSubscriptionsDashboard />}
-      </main>
+              <button
+                id="nav-tab-family"
+                onClick={() => handleTabChange('family')}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
+                  activeTab === 'family'
+                    ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
+                    : 'text-savanna-900 hover:bg-savanna-200/60'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span>Famille</span>
+              </button>
 
-      {/* Footer */}
-      <footer className="glass-card border-t border-brand-300 py-6 px-4 text-center text-xs text-savanna-800 space-y-3 mt-12">
-        <div className="font-extrabold text-brand-800 text-sm">
-          🇨🇬 Mwana Lari — EdTech & Patrimoine Linguistique
-        </div>
-        <p className="max-w-xl mx-auto font-medium">
-          « Apprendre sa langue. Comprendre ses racines. Préparer son avenir. »
-        </p>
-        
-        {/* Compliance & Privacy Links */}
-        <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] font-bold text-savanna-800 pt-1 border-t border-brand-200/60 max-w-lg mx-auto">
-          <button
-            onClick={() => setIsPrivacyModalOpen(true)}
-            className="hover:text-brand-700 underline decoration-brand-400 transition-colors flex items-center gap-1"
-          >
-            <Shield className="w-3 h-3 text-forest-600" />
-            <span>Vie Privée & Données Mineurs (Loi n° 29-2019)</span>
-          </button>
-          <span>•</span>
-          <button
-            onClick={() => setIsLegalModalOpen(true)}
-            className="hover:text-brand-700 underline decoration-brand-400 transition-colors flex items-center gap-1"
-          >
-            <Scale className="w-3 h-3 text-amber-700" />
-            <span>Mentions Légales & Sécurité (RFC 9116)</span>
-          </button>
-        </div>
+              <button
+                id="nav-tab-school"
+                onClick={() => handleTabChange('school')}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
+                  activeTab === 'school'
+                    ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
+                    : 'text-savanna-900 hover:bg-savanna-200/60'
+                }`}
+              >
+                <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span>École</span>
+              </button>
 
-        <div className="text-[11px] text-savanna-700 font-semibold flex items-center justify-center gap-2">
-          <span>Propulsé par Mwana Languages SaaS Platform</span>
-          <span>•</span>
-          <span className="text-forest-700 font-bold">Mises à jour automatiques PWA actives (v2.1)</span>
-        </div>
-      </footer>
+              {isAdmin && (
+                <button
+                  id="nav-tab-admin"
+                  onClick={() => handleTabChange('admin')}
+                  className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl font-extrabold text-[11px] sm:text-xs transition-all whitespace-nowrap flex-shrink-0 ${
+                    activeTab === 'admin'
+                      ? 'bg-gradient-to-r from-brand-700 via-amber-600 to-terracotta-600 text-white shadow-md shadow-brand-500/30 ring-2 ring-amber-300'
+                      : 'text-brand-900 bg-brand-50/90 hover:bg-brand-100 border border-brand-300'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600" />
+                  <span>Administration & Abonnements</span>
+                </button>
+              )}
+
+            </div>
+          </nav>
+
+          {/* Main Content View Container */}
+          <main className="flex-1 max-w-7xl w-full mx-auto px-2.5 sm:px-4 py-4 sm:py-6">
+            {activeTab === 'dashboard' && (
+              <Dashboard
+                profile={activeChild}
+                onEarnXp={handleEarnXp}
+                onNavigate={(tab) => handleTabChange(tab as ActiveTab)}
+              />
+            )}
+
+            {activeTab === 'audiolab' && <AudioLab />}
+
+            {activeTab === 'games' && (
+              <KokoGames
+                onEarnXp={handleEarnXp}
+                onBackToDashboard={() => handleTabChange('dashboard')}
+              />
+            )}
+
+            {activeTab === 'dictionary' && <Dictionary />}
+
+            {activeTab === 'heritage' && <BakuluHeritage />}
+
+            {activeTab === 'family' && <FamilyChallenges />}
+
+            {activeTab === 'school' && <SchoolDashboard />}
+
+            {activeTab === 'admin' && isAdmin && <AdminSubscriptionsDashboard />}
+          </main>
+
+          {/* Footer */}
+          <footer className="glass-card border-t border-brand-300 py-6 px-4 text-center text-xs text-savanna-800 space-y-3 mt-12">
+            <div className="font-extrabold text-brand-800 text-sm">
+              🇨🇬 Mwana Lari — EdTech & Patrimoine Linguistique
+            </div>
+            <p className="max-w-xl mx-auto font-medium">
+              « Apprendre sa langue. Comprendre ses racines. Préparer son avenir. »
+            </p>
+            
+            {/* Compliance & Privacy Links */}
+            <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] font-bold text-savanna-800 pt-1 border-t border-brand-200/60 max-w-lg mx-auto">
+              <button
+                onClick={() => setIsPrivacyModalOpen(true)}
+                className="hover:text-brand-700 underline decoration-brand-400 transition-colors flex items-center gap-1"
+              >
+                <Shield className="w-3 h-3 text-forest-600" />
+                <span>Vie Privée & Données Mineurs (Loi n° 29-2019)</span>
+              </button>
+              <span>•</span>
+              <button
+                onClick={() => setIsLegalModalOpen(true)}
+                className="hover:text-brand-700 underline decoration-brand-400 transition-colors flex items-center gap-1"
+              >
+                <Scale className="w-3 h-3 text-amber-700" />
+                <span>Mentions Légales & Sécurité (RFC 9116)</span>
+              </button>
+            </div>
+
+            <div className="text-[11px] text-savanna-700 font-semibold flex items-center justify-center gap-2">
+              <span>Propulsé par Mwana Languages SaaS Platform</span>
+              <span>•</span>
+              <span className="text-forest-700 font-bold">Mises à jour automatiques PWA actives (v2.1)</span>
+            </div>
+          </footer>
+        </>
+      )}
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+      />
+
+      {/* Subscription Modal */}
+      <SubscriptionModal
+        isOpen={isSubscriptionModalOpen}
+        onClose={() => setIsSubscriptionModalOpen(false)}
+      />
 
       {/* Parental Gate PIN Modal for Protected Tabs & Role Switches */}
       <ParentalPinModal
@@ -483,6 +547,12 @@ function MwanaLariApp() {
       <LegalNoticeModal
         isOpen={isLegalModalOpen}
         onClose={() => setIsLegalModalOpen(false)}
+      />
+
+      {/* PWA Native Installation Prompt & Guide Modal */}
+      <PWAInstallPrompt
+        forceOpen={isPwaInstallModalOpen}
+        onClose={() => setIsPwaInstallModalOpen(false)}
       />
 
     </div>

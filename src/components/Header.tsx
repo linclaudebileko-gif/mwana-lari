@@ -23,13 +23,25 @@ import {
   CheckCircle2,
   X,
   Crown,
-  Zap
+  Zap,
+  Lock,
+  Unlock,
+  KeyRound,
+  ShieldAlert,
+  FileText,
+  Scale,
+  Smartphone,
+  Download
 } from 'lucide-react';
 import { AuthModal } from './AuthModal';
 import { AddChildModal } from './AddChildModal';
 import { SubscriptionModal } from './SubscriptionModal';
+import { ParentalPinModal } from './ParentalPinModal';
+import { SecuritySettingsModal } from './SecuritySettingsModal';
+import { PrivacyPolicyModal } from './PrivacyPolicyModal';
+import { LegalNoticeModal } from './LegalNoticeModal';
 import { playSuccessChime } from '../utils/audio';
-import { CURRENT_APP_VERSION, checkForAppUpdates, applyAppUpdate } from '../utils/pwa';
+import { CURRENT_APP_VERSION, checkForAppUpdates, applyAppUpdate, isPwaInstalled } from '../utils/pwa';
 
 interface HeaderProps {
   profile: ChildProfile;
@@ -39,6 +51,8 @@ interface HeaderProps {
   pendingSyncCount?: number;
   onManualSync?: () => void;
   isSyncing?: boolean;
+  onOpenInstallPrompt?: () => void;
+  onLogoClick?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -49,17 +63,46 @@ export const Header: React.FC<HeaderProps> = ({
   pendingSyncCount = 0,
   onManualSync,
   isSyncing = false,
+  onOpenInstallPrompt,
+  onLogoClick,
 }) => {
-  const { user, isAuthenticated, logout, isServerOnline, childrenList, activeChild, setActiveChild, isPremium, subscription } = useAuth();
+  const {
+    user,
+    isAuthenticated,
+    logout,
+    isServerOnline,
+    childrenList,
+    activeChild,
+    setActiveChild,
+    isPremium,
+    subscription,
+    isParentUnlocked,
+    lockParentalGate,
+    hasParentalPin
+  } = useAuth();
   
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
   const [isAddChildModalOpen, setIsAddChildModalOpen] = useState(false);
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
+  const [isParentalPinModalOpen, setIsParentalPinModalOpen] = useState(false);
+  const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
+  const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
+  const [pendingParentalAction, setPendingParentalAction] = useState<(() => void) | null>(null);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [updateStatusMessage, setUpdateStatusMessage] = useState<string | null>(null);
+
+  const requireParentalGate = (action: () => void) => {
+    if (isParentUnlocked) {
+      action();
+    } else {
+      setPendingParentalAction(() => action);
+      setIsParentalPinModalOpen(true);
+    }
+  };
 
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
@@ -103,9 +146,20 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-1.5 sm:gap-4">
           
           {/* Left: Logo & Title */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-brand-500 via-amber-400 to-terracotta-500 flex items-center justify-center text-white font-bold text-lg sm:text-xl shadow-md shadow-brand-500/30 transform hover:scale-105 transition-transform cursor-pointer">
-              🇨🇬
+          <div
+            className="flex items-center gap-2 sm:gap-3 flex-shrink-0 cursor-pointer group"
+            onClick={onLogoClick}
+            title="Revenir au Site Vitrine / Accueil"
+          >
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-savanna-100 border border-amber-300 p-1 flex items-center justify-center shadow-md shadow-brand-500/20 transform group-hover:scale-105 transition-transform">
+              <img
+                src="/icons/icon-192.svg"
+                alt="Mwana Lari Logo"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
             </div>
             <div>
               <div className="flex items-center gap-1 sm:gap-1.5">
@@ -114,7 +168,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </span>
                 <span className="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-forest-100 text-forest-800 font-bold border border-forest-500/30 flex items-center gap-0.5 sm:gap-1">
                   <Database className="w-2 sm:w-2.5 h-2 sm:h-2.5 text-forest-600" />
-                  v2.1
+                  PWA v2.1
                 </span>
               </div>
               <p className="text-[11px] text-savanna-800 font-medium hidden md:block">
@@ -155,10 +209,31 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Right: Actions, Updates, Network & Profile */}
           <div className="flex items-center gap-1.5 sm:gap-2">
             
-            {/* Mobile Money / Subscription Button */}
+            {/* Parental Gate Quick Status / Lock Toggle */}
+            {isParentUnlocked ? (
+              <button
+                onClick={lockParentalGate}
+                className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-forest-100 hover:bg-forest-200 border border-forest-300 text-forest-900 text-xs font-black transition-all shadow-sm active:scale-95"
+                title="Espace Parent Déverrouillé (Cliquer pour Reverrouiller en Mode Enfant)"
+              >
+                <Unlock className="w-3.5 h-3.5 text-forest-600 flex-shrink-0 animate-pulse" />
+                <span className="hidden lg:inline">Parent Actif</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => requireParentalGate(() => setIsSecurityModalOpen(true))}
+                className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-savanna-100 hover:bg-savanna-200 border border-savanna-300 text-savanna-800 text-xs font-extrabold transition-all shadow-sm active:scale-95"
+                title="Mode Enfant Protégé (Cliquer pour Déverrouiller l'Espace Parent)"
+              >
+                <Lock className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                <span className="hidden lg:inline">Mode Enfant</span>
+              </button>
+            )}
+
+            {/* Mobile Money / Subscription Button (Protected by Parental Gate) */}
             {isPremium ? (
               <button
-                onClick={() => setIsSubscriptionModalOpen(true)}
+                onClick={() => requireParentalGate(() => setIsSubscriptionModalOpen(true))}
                 className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-brand-500 hover:brightness-110 text-white text-xs font-black shadow-md shadow-amber-500/20 transition-all active:scale-95 border border-amber-300"
                 title="Gérer votre abonnement Premium"
               >
@@ -168,13 +243,26 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             ) : (
               <button
-                onClick={() => setIsSubscriptionModalOpen(true)}
+                onClick={() => requireParentalGate(() => setIsSubscriptionModalOpen(true))}
                 className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-brand-600 via-amber-500 to-terracotta-600 hover:brightness-110 text-white text-xs font-black shadow-md shadow-brand-500/30 transition-all active:scale-95 animate-pulse"
                 title="S'abonner via MTN MoMo ou Airtel Money (1 500 FCFA)"
               >
                 <Zap className="w-3.5 h-3.5 text-amber-200 fill-amber-200" />
                 <span className="hidden sm:inline">S'abonner (1 500 F)</span>
                 <span className="sm:hidden">1 500 F</span>
+              </button>
+            )}
+
+            {/* Install PWA App Button (if not already installed or on request) */}
+            {onOpenInstallPrompt && (
+              <button
+                onClick={onOpenInstallPrompt}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-forest-600 hover:bg-forest-700 text-white text-xs font-black shadow-md shadow-forest-600/20 transition-all active:scale-95 border border-forest-400"
+                title="Installer Mwana Lari sur votre téléphone (Mode 100% Hors-Ligne)"
+              >
+                <Smartphone className="w-3.5 h-3.5 text-forest-200" />
+                <span className="hidden sm:inline">Installer l'App</span>
+                <span className="sm:hidden">App</span>
               </button>
             )}
 
@@ -259,7 +347,7 @@ export const Header: React.FC<HeaderProps> = ({
                           <button
                             onClick={() => {
                               setIsUserMenuOpen(false);
-                              setIsAddChildModalOpen(true);
+                              requireParentalGate(() => setIsAddChildModalOpen(true));
                             }}
                             className="text-brand-600 hover:text-brand-700 flex items-center gap-0.5 text-[10px]"
                           >
@@ -299,8 +387,13 @@ export const Header: React.FC<HeaderProps> = ({
                       <select
                         value={activeRole}
                         onChange={(e) => {
-                          onRoleChange(e.target.value as UserRole);
+                          const targetRole = e.target.value as UserRole;
                           setIsUserMenuOpen(false);
+                          if (targetRole !== 'CHILD' && !isParentUnlocked) {
+                            requireParentalGate(() => onRoleChange(targetRole));
+                          } else {
+                            onRoleChange(targetRole);
+                          }
                         }}
                         className="w-full text-xs font-bold bg-savanna-50 border border-brand-300 rounded-xl px-2 py-1.5 text-savanna-900 cursor-pointer"
                       >
@@ -308,7 +401,54 @@ export const Header: React.FC<HeaderProps> = ({
                         <option value="PARENT">👨‍👩‍👧 Espace Famille</option>
                         <option value="TEACHER">👨‍🏫 Espace École</option>
                         <option value="ELDER">👵 Voix des Aînés</option>
+                        {user?.role === 'ADMIN' && (
+                          <option value="ADMIN">🛡️ Administration & Abonnements</option>
+                        )}
                       </select>
+                    </div>
+
+                    {/* Security & Parental PIN Settings Entry */}
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        requireParentalGate(() => setIsSecurityModalOpen(true));
+                      }}
+                      className="w-full py-2 px-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-950 text-xs font-extrabold flex items-center justify-between transition-colors border border-amber-200"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <KeyRound className="w-3.5 h-3.5 text-amber-700" />
+                        <span>Sécurité & Code PIN</span>
+                      </div>
+                      <span className="text-[10px] font-black text-amber-800 bg-white px-1.5 py-0.5 rounded border border-amber-300">
+                        {isParentUnlocked ? '🔓 Actif' : '🔒 PIN'}
+                      </span>
+                    </button>
+
+                    {/* Privacy & Legal Modals Entries */}
+                    <div className="grid grid-cols-2 gap-1.5 pt-1">
+                      <button
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          setIsPrivacyModalOpen(true);
+                        }}
+                        className="py-1.5 px-2 rounded-xl bg-forest-50 hover:bg-forest-100 text-forest-900 text-[11px] font-bold flex items-center justify-center gap-1 transition-colors border border-forest-200"
+                        title="Politique de Confidentialité"
+                      >
+                        <FileText className="w-3 h-3 text-forest-600" />
+                        <span>Vie Privée</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          setIsLegalModalOpen(true);
+                        }}
+                        className="py-1.5 px-2 rounded-xl bg-savanna-50 hover:bg-savanna-100 text-savanna-900 text-[11px] font-bold flex items-center justify-center gap-1 transition-colors border border-savanna-200"
+                        title="Mentions Légales & Sécurité"
+                      >
+                        <Scale className="w-3 h-3 text-savanna-600" />
+                        <span>Légal & RFC</span>
+                      </button>
                     </div>
 
                     {/* Logout Button */}
@@ -429,6 +569,27 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
+      {/* Parental Gate PIN Modal */}
+      <ParentalPinModal
+        isOpen={isParentalPinModalOpen}
+        onClose={() => {
+          setIsParentalPinModalOpen(false);
+          setPendingParentalAction(null);
+        }}
+        onSuccess={() => {
+          if (pendingParentalAction) {
+            pendingParentalAction();
+            setPendingParentalAction(null);
+          }
+        }}
+      />
+
+      {/* Security & PIN Settings Modal */}
+      <SecuritySettingsModal
+        isOpen={isSecurityModalOpen}
+        onClose={() => setIsSecurityModalOpen(false)}
+      />
+
       {/* Auth Modal */}
       <AuthModal
         isOpen={isAuthModalOpen}
@@ -447,6 +608,19 @@ export const Header: React.FC<HeaderProps> = ({
         isOpen={isSubscriptionModalOpen}
         onClose={() => setIsSubscriptionModalOpen(false)}
       />
+
+      {/* Privacy Policy Modal */}
+      <PrivacyPolicyModal
+        isOpen={isPrivacyModalOpen}
+        onClose={() => setIsPrivacyModalOpen(false)}
+      />
+
+      {/* Legal Notice & Security Modal */}
+      <LegalNoticeModal
+        isOpen={isLegalModalOpen}
+        onClose={() => setIsLegalModalOpen(false)}
+      />
     </>
   );
 };
+

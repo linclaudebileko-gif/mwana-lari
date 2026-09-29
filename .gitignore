@@ -10,6 +10,7 @@ dist/
 build/
 assets/
 public/assets/
+public/audio/words/
 mwana-lari-wp/
 mwana-lari-wp.zip
 .next/

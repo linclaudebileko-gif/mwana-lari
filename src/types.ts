@@ -83,17 +83,20 @@ export interface StudentProgress {
 
 export type GameMode = 'riddle' | 'match' | 'listen' | 'puzzle';
 
+export interface RiddleOption {
+  id: string;
+  wordNative: string;
+  translationFr: string;
+  translationEn?: string;
+  icon: string;
+  isCorrect: boolean;
+}
+
 export interface RiddleQuestion {
   id: string;
   riddleFr: string;
   clue?: string;
-  options: {
-    id: string;
-    wordNative: string;
-    translationFr: string;
-    icon: string;
-    isCorrect: boolean;
-  }[];
+  options: RiddleOption[];
   culturalExplanation: string;
 }
 
@@ -101,7 +104,16 @@ export interface MatchPair {
   id: string;
   wordNative: string;
   translationFr: string;
+  translationEn?: string;
   icon: string;
+}
+
+export interface ListenOption {
+  id: string;
+  translationFr: string;
+  translationEn?: string;
+  icon: string;
+  isCorrect: boolean;
 }
 
 export interface ListenQuestion {
@@ -109,18 +121,14 @@ export interface ListenQuestion {
   wordNative: string;
   audioPhrase: string;
   promptFr: string;
-  options: {
-    id: string;
-    translationFr: string;
-    icon: string;
-    isCorrect: boolean;
-  }[];
+  options: ListenOption[];
 }
 
 export interface WordPuzzleItem {
   id: string;
   wordNative: string;
   translationFr: string;
+  translationEn?: string;
   icon: string;
   syllables: string[];
 }
@@ -166,4 +174,71 @@ export interface PaymentTransaction {
   createdAt: string;
   referenceCode: string;
 }
+
+export interface ParentalSecurityState {
+  isParentUnlocked: boolean;
+  hasCustomPin: boolean;
+  unlockedUntil: number | null;
+}
+
+export type SubscriptionStateStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELED' | 'PENDING';
+
+export interface AdminSubscriberItem {
+  id: string;
+  userId: string;
+  fullName: string;
+  email: string;
+  phoneNumber: string;
+  role: UserRole;
+  planId: string;
+  planName: string;
+  tier: SubscriptionTier;
+  status: SubscriptionStateStatus;
+  paymentMethod: PaymentMethod;
+  startDate: string;
+  endDate: string;
+  transactionReference?: string;
+  autoRenew: boolean;
+}
+
+export interface AdminTransactionItem {
+  id: string;
+  userId: string;
+  userName?: string;
+  userEmail?: string;
+  planId: string;
+  planName?: string;
+  amount: number;
+  currency: 'XAF' | 'EUR' | 'USD';
+  provider: PaymentMethod;
+  phoneNumber?: string;
+  status: 'SUCCESS' | 'PENDING' | 'FAILED';
+  transactionRef: string;
+  providerTransactionId?: string;
+  createdAt: string;
+}
+
+export interface NetworkRevenueStats {
+  totalRevenueFcfa: number;
+  totalRevenueEur: number;
+  activeSubscribersCount: number;
+  expiredSubscribersCount: number;
+  momoCount: number;
+  momoRevenueFcfa: number;
+  airtelCount: number;
+  airtelRevenueFcfa: number;
+  cardCount: number;
+  cardRevenueEur: number;
+  successRatePercent: number;
+}
+
+export interface ManualGrantPayload {
+  emailOrPhone: string;
+  fullName?: string;
+  tier: SubscriptionTier;
+  durationMonths: number;
+  notes?: string;
+}
+
+
 

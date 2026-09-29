@@ -528,15 +528,24 @@ def verify_payment(transaction_id: str, db: Session = Depends(get_db)):
     }
 
 @router.post("/webhook/{provider}")
-def momo_webhook(
+async def momo_webhook(
     provider: str,
     payload: dict,
+    request: Request,
     x_signature: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """
     Webhook sécurisé pour la réception des callbacks instantanés des passerelles (OpenPay, MTN MoMo, Airtel).
     """
+    if provider.lower() == "openpay":
+        return await openpay_webhook(
+            payload=payload,
+            request=request,
+            x_signature=x_signature,
+            db=db
+        )
+
     if settings.ENVIRONMENT == "production":
         expected_secret = settings.WEBHOOK_SECRET
         if not x_signature or (x_signature != expected_secret and x_signature != f"sha256={expected_secret}"):

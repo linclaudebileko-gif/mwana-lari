@@ -33,3 +33,182 @@ body {
 .baobab-glow {
   filter: drop-shadow(0 0 15px rgba(34, 197, 94, 0.4));
 }
+
+.gold-glow {
+  filter: drop-shadow(0 0 18px rgba(245, 158, 11, 0.45));
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(245, 158, 11, 0.6);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-float-slow {
+  animation: floatSlow 4s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+.shimmer-btn {
+  background-size: 200% 100%;
+  animation: shimmer 3s infinite linear;
+}
+
+/* Custom smooth scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #fdf6e2;
+}
+::-webkit-scrollbar-thumb {
+  background: #d97706;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b45309;
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 0.5cm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  header, nav, footer, .no-print {
+    display: none !important;
+  }
+
+  .print-certificate-container {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+}
+
+/* Animated Hero Video & Atmospheric Effects */
+@keyframes kenBurnsZoom {
+  0% {
+    transform: scale(1.0) translate(0, 0);
+  }
+  50% {
+    transform: scale(1.08) translate(-1%, -1%);
+  }
+  100% {
+    transform: scale(1.0) translate(0, 0);
+  }
+}
+
+@keyframes floatFirefly {
+  0% {
+    transform: translateY(0) translateX(0) scale(0.8);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.9;
+  }
+  80% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(-80px) translateX(15px) scale(1.2);
+    opacity: 0;
+  }
+}
+
+@keyframes soundWaveBounce {
+  0%, 100% {
+    transform: scaleY(0.25);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes pulseLive {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.4);
+    opacity: 0.4;
+  }
+}
+
+.animate-ken-burns {
+  animation: kenBurnsZoom 16s ease-in-out infinite;
+}
+
+.animate-firefly-1 {
+  animation: floatFirefly 5s ease-in-out infinite;
+}
+.animate-firefly-2 {
+  animation: floatFirefly 6.5s ease-in-out infinite 1.2s;
+}
+.animate-firefly-3 {
+  animation: floatFirefly 4.8s ease-in-out infinite 2.5s;
+}
+.animate-firefly-4 {
+  animation: floatFirefly 7s ease-in-out infinite 3.5s;
+}
+
+.animate-soundwave-1 {
+  animation: soundWaveBounce 0.8s ease-in-out infinite;
+  transform-origin: bottom;
+}
+.animate-soundwave-2 {
+  animation: soundWaveBounce 0.6s ease-in-out infinite 0.15s;
+  transform-origin: bottom;
+}
+.animate-soundwave-3 {
+  animation: soundWaveBounce 0.9s ease-in-out infinite 0.3s;
+  transform-origin: bottom;
+}
+.animate-soundwave-4 {
+  animation: soundWaveBounce 0.7s ease-in-out infinite 0.45s;
+  transform-origin: bottom;
+}
+
+.animate-live-dot {
+  animation: pulseLive 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+

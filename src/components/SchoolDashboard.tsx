@@ -3,8 +3,9 @@ import { useAuth } from '../context/AuthContext';
 import { CLASS_STUDENTS } from '../data/mockData';
 import { parentsAPI } from '../services/api';
 import { StudentProgress } from '../types';
-import { GraduationCap, Users, BookOpen, Download, Plus, CheckCircle2, TrendingUp, Sparkles, Database } from 'lucide-react';
+import { GraduationCap, Users, BookOpen, Download, Plus, CheckCircle2, TrendingUp, Sparkles, Database, Printer, Award } from 'lucide-react';
 import { AddChildModal } from './AddChildModal';
+import { CertificateModal } from './CertificateModal';
 import { playSuccessChime } from '../utils/audio';
 
 export const SchoolDashboard: React.FC = () => {
@@ -12,6 +13,7 @@ export const SchoolDashboard: React.FC = () => {
   const [students, setStudents] = useState<StudentProgress[]>(CLASS_STUDENTS);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedStudentForCert, setSelectedStudentForCert] = useState<StudentProgress | null>(null);
 
   const handleExportPDF = () => {
     setIsExporting(true);
@@ -115,6 +117,7 @@ export const SchoolDashboard: React.FC = () => {
                 <th className="py-3 px-4">Leçons Faites</th>
                 <th className="py-3 px-4">Progression</th>
                 <th className="py-3 px-4">Statut</th>
+                <th className="py-3 px-4 text-right">Diplôme</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
@@ -141,6 +144,19 @@ export const SchoolDashboard: React.FC = () => {
                   <td className="py-3 px-4 text-xs font-bold text-emerald-700">
                     🟢 En ligne ({st.lastActive})
                   </td>
+                  <td className="py-3 px-4 text-right">
+                    <button
+                      onClick={() => {
+                        playSuccessChime();
+                        setSelectedStudentForCert(st);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs shadow-sm flex items-center gap-1 ml-auto transition-all active:scale-95"
+                      title="Générer et imprimer le diplôme de l'élève"
+                    >
+                      <Award className="w-3.5 h-3.5" />
+                      <span>Diplôme (PDF)</span>
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -152,6 +168,21 @@ export const SchoolDashboard: React.FC = () => {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
       />
+
+      {/* Student Official Certificate Modal */}
+      {selectedStudentForCert && (
+        <CertificateModal
+          isOpen={!!selectedStudentForCert}
+          onClose={() => setSelectedStudentForCert(null)}
+          data={{
+            recipientName: selectedStudentForCert.name,
+            level: selectedStudentForCert.level,
+            xpPoints: selectedStudentForCert.wordsLearned * 15 + 120,
+            streakDays: 7,
+            wordsLearned: selectedStudentForCert.wordsLearned,
+          }}
+        />
+      )}
 
     </div>
   );

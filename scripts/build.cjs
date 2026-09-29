@@ -15,8 +15,16 @@ function copyDir(src, dest, ignoreDirs = []) {
     if (ignoreDirs.includes(item)) continue;
     const s = path.join(src, item);
     const d = path.join(dest, item);
-    if (fs.statSync(s).isDirectory()) copyDir(s, d, ignoreDirs);
-    else fs.copyFileSync(s, d);
+    if (fs.statSync(s).isDirectory()) {
+      copyDir(s, d, ignoreDirs);
+    } else {
+      const ext = path.extname(item).toLowerCase();
+      // If .wav and a matching .mp3 exists in the same folder, skip redundant heavy wav in production bundle
+      if (ext === '.wav' && fs.existsSync(s.replace(/\.wav$/i, '.mp3'))) {
+        continue;
+      }
+      fs.copyFileSync(s, d);
+    }
   }
 }
 
@@ -27,6 +35,7 @@ removeDir('dist');
 fs.mkdirSync('dist/assets', { recursive: true });
 
 console.log('🚀 [Build] 2. Génération et copie des fichiers audio & PWA...');
+execSync('node scripts/generate_png_icons.cjs', { stdio: 'inherit' });
 execSync('node scripts/generate_audio.js', { stdio: 'inherit' });
 copyDir('public', 'dist', ['assets']);
 
@@ -45,21 +54,24 @@ if (fs.existsSync('dist/assets/index.css')) {
 
 console.log('🚀 [Build] 4. Préparation de dist/index.html (compatible racine & sous-dossiers WordPress)...');
 let html = fs.readFileSync('index.html', 'utf8');
-html = html.replace('/src/main.tsx', './assets/index.js?v=3.0');
-html = html.replace(/src=["'][^"']*assets\/index\.js[^"']*["']/g, 'src="./assets/index.js?v=3.0"');
+html = html.replace('/src/main.tsx', './assets/index.js?v=3.2');
+html = html.replace(/src=["'][^"']*assets\/index\.js[^"']*["']/g, 'src="./assets/index.js?v=3.2"');
 html = html.replace(/href=["'][^"']*manifest\.json["']/g, 'href="./manifest.json"');
-html = html.replace(/href=["'][^"']*vite\.svg["']/g, 'href="./vite.svg"');
+html = html.replace(/href=["'][^"']*favicon\.svg["']/g, 'href="./favicon.svg"');
+html = html.replace(/href=["'][^"']*icons\/icon-192\.svg["']/g, 'href="./icons/icon-192.svg"');
 fs.writeFileSync('dist/index.html', html, 'utf8');
 
 console.log('🚀 [Build] 5. Synchronisation du dossier mwana-lari-wp/...');
 removeDir('mwana-lari-wp');
 copyDir('dist', 'mwana-lari-wp');
 
-console.log('📦 [Build] 6. Création de l\'archive ZIP pour le Gestionnaire de Fichiers WordPress (mwana-lari-wp.zip)...');
+console.log('📦 [Build] 6. Création de l\'archive ZIP ultra-légère (mwana-lari-v3.zip)...');
 try {
-  if (fs.existsSync('mwana-lari-wp.zip')) fs.unlinkSync('mwana-lari-wp.zip');
-  execSync('powershell -Command "Compress-Archive -Path dist/* -DestinationPath mwana-lari-wp.zip -Force"', { stdio: 'ignore' });
-  console.log('✅ [Build] mwana-lari-wp.zip généré avec succès à la racine du projet !');
+  if (fs.existsSync('mwana-lari-v3.zip')) {
+    try { fs.unlinkSync('mwana-lari-v3.zip'); } catch {}
+  }
+  execSync('powershell -Command "Compress-Archive -Path \'dist\\*\' -DestinationPath \'mwana-lari-v3.zip\' -Force"', { stdio: 'ignore' });
+  console.log('✅ [Build] mwana-lari-v3.zip généré avec succès !');
 } catch (e) {
   console.warn('Note: ZIP generation skipped or handled externally');
 }

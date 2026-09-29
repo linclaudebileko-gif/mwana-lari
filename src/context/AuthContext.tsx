@@ -13,6 +13,15 @@ import { ChildProfile, UserRole, SubscriptionStatus, SubscriptionTier, PaymentMe
 import { INITIAL_CHILD_PROFILE } from '../data/mockData';
 import { paymentsAPI } from '../services/api';
 
+import {
+  isParentSessionValid,
+  setParentUnlockedSession,
+  lockParentSession,
+  verifyParentalPin,
+  saveParentalPin,
+  hasCustomParentalPin
+} from '../utils/security';
+
 interface AuthContextType {
   user: UserSession | null;
   isAuthenticated: boolean;
@@ -23,6 +32,8 @@ interface AuthContextType {
   childrenList: ChildProfile[];
   subscription: SubscriptionStatus;
   isPremium: boolean;
+  isParentUnlocked: boolean;
+  hasParentalPin: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (payload: RegisterPayload, initialChildName?: string) => Promise<void>;
   logout: () => void;
@@ -38,6 +49,10 @@ interface AuthContextType {
     paymentMethod: PaymentMethod;
     phoneNumber?: string;
   }) => Promise<void>;
+  unlockParentalGate: (pin: string) => Promise<boolean>;
+  unlockWithMathChallenge: (answer: number, expected: number) => boolean;
+  lockParentalGate: () => void;
+  updateParentalPin: (newPin: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,9 +67,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return paymentsAPI.getLocalSubscription() as SubscriptionStatus;
   });
 
+  const [isParentUnlocked, setIsParentUnlocked] = useState<boolean>(() => isParentSessionValid());
+  const [hasParentalPinState, setHasParentalPinState] = useState<boolean>(() => hasCustomParentalPin());
+
   // Computed active role: user role if logged in, otherwise 'CHILD'
   const activeRole: UserRole = user ? user.role : 'CHILD';
   const isPremium: boolean = subscription.isPremium;
+  const hasParentalPin: boolean = hasParentalPinState;
 
   const checkHealth = async () => {
     try {
@@ -81,6 +100,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const refreshSubscription = async () => {
+    try {
+      const liveSub = await paymentsAPI.getMySubscription();
+      if (liveSub) {
+        setSubscription(liveSub as SubscriptionStatus);
+      }
+    } catch (err) {
+      console.warn('Erreur synchronisation abonnement:', err);
+    }
+  };
+
   // Restore session on mount
   useEffect(() => {
     const initAuth = async () => {
@@ -90,6 +120,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const stored = getStoredSession();
       if (stored) {
         setUser(stored);
+
+        // Si le serveur est accessible, valide la session HttpOnly et rafraîchit si besoin
+        try {
+          const me = await authAPI.getMe();
+          if (me) {
+            const liveSession: UserSession = {
+              id: me.id,
+              email: me.email,
+              role: me.role,
+              fullName: me.full_name,
+              phoneNumber: me.phone_number,
+              countryCode: me.country_code,
+            };
+            setUser(liveSession);
+            setStoredSession(liveSession);
+          }
+        } catch {
+          // Mode hors-ligne ou session expirée : conserve les données locales hors-ligne si non-401
+        }
+
+        await refreshSubscription();
         if (stored.role === 'PARENT') {
           try {
             const kids = await parentsAPI.getChildren();
@@ -113,6 +164,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const session = await authAPI.login(email, pass);
       setUser(session);
+      await refreshSubscription();
       if (session.role === 'PARENT') {
         await refreshChildren();
       }
@@ -126,6 +178,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const session = await authAPI.register(payload, initialChildName);
       setUser(session);
+      await refreshSubscription();
       if (session.role === 'PARENT') {
         await refreshChildren();
       }
@@ -135,10 +188,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = () => {
-    clearStoredSession();
+    authAPI.logout();
     setUser(null);
     setChildrenList([INITIAL_CHILD_PROFILE]);
     setActiveChildState(INITIAL_CHILD_PROFILE);
+    const freeSub: SubscriptionStatus = {
+      isPremium: false,
+      tier: 'FREE',
+      planName: 'Découverte (Gratuit)',
+      billingCycle: 'monthly',
+      expiresAt: '',
+    };
+    setSubscription(freeSub);
+    paymentsAPI.saveLocalSubscription(freeSub);
   };
 
   const loginAsDemo = async (demoType: 'parent' | 'teacher' | 'linguist' | 'admin') => {
@@ -146,6 +208,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const session = await authAPI.demoLogin(demoType);
       setUser(session);
+      await refreshSubscription();
       if (session.role === 'PARENT') {
         await refreshChildren();
       }
@@ -203,6 +266,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     paymentsAPI.saveLocalSubscription(newSub);
   };
 
+  const unlockParentalGate = async (pin: string): Promise<boolean> => {
+    const isValid = await verifyParentalPin(pin);
+    if (isValid) {
+      setParentUnlockedSession(15);
+      setIsParentUnlocked(true);
+      return true;
+    }
+    return false;
+  };
+
+  const unlockWithMathChallenge = (answer: number, expected: number): boolean => {
+    if (answer === expected) {
+      setParentUnlockedSession(15);
+      setIsParentUnlocked(true);
+      return true;
+    }
+    return false;
+  };
+
+  const lockParentalGate = () => {
+    lockParentSession();
+    setIsParentUnlocked(false);
+  };
+
+  const updateParentalPin = async (newPin: string): Promise<void> => {
+    await saveParentalPin(newPin);
+    setHasParentalPinState(true);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -215,6 +307,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         childrenList,
         subscription,
         isPremium,
+        isParentUnlocked,
+        hasParentalPin,
         login,
         register,
         logout,
@@ -225,6 +319,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         refreshChildren,
         checkHealth,
         upgradeSubscription,
+        unlockParentalGate,
+        unlockWithMathChallenge,
+        lockParentalGate,
+        updateParentalPin,
       }}
     >
       {children}

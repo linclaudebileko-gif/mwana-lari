@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { FAMILY_CHALLENGES } from '../data/mockData';
 import { parentsAPI } from '../services/api';
-import { Users, Trophy, Mic, CheckCircle2, Heart, Award, Sparkles, Plus, RefreshCw, Crown, Zap, Smartphone, CreditCard } from 'lucide-react';
+import { Users, Trophy, Mic, CheckCircle2, Heart, Award, Sparkles, Plus, RefreshCw, Crown, Zap, Smartphone, CreditCard, GraduationCap, Printer } from 'lucide-react';
 import { playSuccessChime } from '../utils/audio';
 import { AddChildModal } from './AddChildModal';
 import { SubscriptionModal } from './SubscriptionModal';
+import { CertificateModal } from './CertificateModal';
 
 export const FamilyChallenges: React.FC = () => {
   const { user, childrenList, activeChild, setActiveChild, updateActiveChildStats, isPremium, subscription } = useAuth();
@@ -14,6 +15,7 @@ export const FamilyChallenges: React.FC = () => {
   const [recordedAudioSuccess, setRecordedAudioSuccess] = useState(false);
   const [isAddChildModalOpen, setIsAddChildModalOpen] = useState(false);
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
+  const [selectedChildForCert, setSelectedChildForCert] = useState<any | null>(null);
   const [childStats, setChildStats] = useState<Record<string, any>>({});
   const [loadingStats, setLoadingStats] = useState(false);
 
@@ -345,6 +347,63 @@ export const FamilyChallenges: React.FC = () => {
         )}
       </div>
 
+      {/* Official Diplomas & Certificates Gallery */}
+      <div className="glass-card rounded-3xl p-6 sm:p-8 border-2 border-amber-300 shadow-xl space-y-4 bg-gradient-to-r from-amber-50/80 via-yellow-50/50 to-white">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center text-2xl shadow-md">
+              🎓
+            </div>
+            <div>
+              <h3 className="font-extrabold text-xl text-savanna-950">
+                Diplômes & Trophées Officiels de la Famille
+              </h3>
+              <p className="text-xs text-savanna-700 font-medium">
+                Certificats officiels « Mwana ya Mayele » délivrés par l'Académie Lari (Standard MBUTA).
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 pt-2">
+          {childrenList.map((child) => (
+            <div
+              key={child.id}
+              className="p-4 rounded-2xl bg-white border-2 border-amber-200 shadow-sm flex flex-col justify-between space-y-3"
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <h4 className="font-black text-base text-savanna-950">
+                    {child.firstName}
+                  </h4>
+                  <p className="text-xs text-brand-700 font-bold">
+                    Niveau {child.level} • {child.xpPoints} XP
+                  </p>
+                </div>
+                <span className="w-8 h-8 rounded-full bg-amber-100 text-amber-900 font-bold text-sm flex items-center justify-center border border-amber-300">
+                  🏆
+                </span>
+              </div>
+
+              <div className="text-[11px] text-savanna-700 font-medium">
+                {child.streakDays} jours d'assiduité • {50 + child.level * 25}+ mots validés
+              </div>
+
+              <button
+                onClick={() => {
+                  playSuccessChime();
+                  setSelectedChildForCert(child);
+                }}
+                className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-brand-500 hover:brightness-110 text-white font-extrabold text-xs shadow-md flex items-center justify-center gap-1.5 transition-all active:scale-95"
+              >
+                <GraduationCap className="w-4 h-4" />
+                <span>Voir le Diplôme (PDF)</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <AddChildModal
         isOpen={isAddChildModalOpen}
         onClose={() => setIsAddChildModalOpen(false)}
@@ -354,6 +413,21 @@ export const FamilyChallenges: React.FC = () => {
         isOpen={isSubscriptionModalOpen}
         onClose={() => setIsSubscriptionModalOpen(false)}
       />
+
+      {/* Official Certificate Modal */}
+      {selectedChildForCert && (
+        <CertificateModal
+          isOpen={!!selectedChildForCert}
+          onClose={() => setSelectedChildForCert(null)}
+          data={{
+            recipientName: selectedChildForCert.firstName,
+            level: selectedChildForCert.level,
+            xpPoints: selectedChildForCert.xpPoints,
+            streakDays: selectedChildForCert.streakDays,
+            wordsLearned: 50 + selectedChildForCert.level * 25,
+          }}
+        />
+      )}
 
     </div>
   );

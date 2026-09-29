@@ -1,9 +1,13 @@
 import { WordItem, CulturalStory, LessonUnit, ChildProfile, UserRole, AdminSubscriberItem, AdminTransactionItem, ManualGrantPayload, SubscriptionStateStatus, NetworkRevenueStats } from '../types';
 
-const API_BASE_URL = (typeof window !== 'undefined' && (window as any).__MWANA_API_URL__) || 'http://localhost:8000/api/v1';
+export const API_BASE_URL = 
+  (typeof window !== 'undefined' && ((window as any).__MWANA_API_URL__ || (window as any).VITE_API_URL)) ||
+  (typeof process !== 'undefined' && (process as any).env?.VITE_API_URL) ||
+  (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? (window.location.port === '3000' ? '/api/v1' : 'http://localhost:8000/api/v1')
+    : 'https://mwana-lari-api.onrender.com/api/v1');
 
 // Storage keys
-const TOKEN_KEY = 'mwana_lari_token';
 const USER_KEY = 'mwana_lari_user';
 
 export interface UserSession {
@@ -11,7 +15,7 @@ export interface UserSession {
   email: string;
   role: UserRole;
   fullName: string;
-  token: string;
+  token?: string; // Conservé optionnel pour compatibilité de type, mais AUCUN JWT sensible n'est stocké
   phoneNumber?: string;
   countryCode?: string;
 }
@@ -57,26 +61,49 @@ export interface ContributeStoryPayload {
   audioUrl?: string;
 }
 
-// Token helper functions
+// =========================================================================
+// SÉCURITÉ : GESTION DES SESSIONS & ANTI-CSRF (Zéro JWT dans le stockage JS)
+// =========================================================================
+
+/**
+ * Lit le jeton CSRF déposé par le serveur dans le cookie 'mwana_csrf_token'
+ */
+export const getCsrfToken = (): string | null => {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(/(^|;\s*)mwana_csrf_token=([^;]+)/);
+  return match ? decodeURIComponent(match[2]) : null;
+};
+
+/**
+ * @deprecated Les jetons sensibles JWT sont désormais gérés exclusivement via des cookies HttpOnly/Secure.
+ * Cette fonction est conservée pour compatibilité d'interface et renvoie toujours null.
+ */
 export const getStoredToken = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(TOKEN_KEY);
+  return null;
 };
 
 export const setStoredSession = (session: UserSession): void => {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(TOKEN_KEY, session.token);
-  localStorage.setItem(USER_KEY, JSON.stringify(session));
+  // Ne stocke QUE les métadonnées de profil utilisateur publiques (sans aucun JWT sensible)
+  const safeSession: UserSession = {
+    id: session.id,
+    email: session.email,
+    role: session.role,
+    fullName: session.fullName,
+    phoneNumber: session.phoneNumber,
+    countryCode: session.countryCode,
+  };
+  localStorage.setItem(USER_KEY, JSON.stringify(safeSession));
+  // Nettoyage proactif de tout ancien jeton qui aurait été stocké dans le navigateur
+  localStorage.removeItem('mwana_lari_token');
 };
 
 export const getStoredSession = (): UserSession | null => {
   if (typeof window === 'undefined') return null;
   const userJson = localStorage.getItem(USER_KEY);
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (!userJson || !token) return null;
+  if (!userJson) return null;
   try {
-    const user = JSON.parse(userJson);
-    return { ...user, token };
+    return JSON.parse(userJson);
   } catch {
     return null;
   }
@@ -84,30 +111,51 @@ export const getStoredSession = (): UserSession | null => {
 
 export const clearStoredSession = (): void => {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  localStorage.removeItem('mwana_lari_token');
 };
 
-// Generic Fetch Wrapper with Authorization & Error Handling
-async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = getStoredToken();
+// Generic Fetch Wrapper with Credentials (HttpOnly Cookies), CSRF & Transparent Auto-Refresh
+async function apiRequest<T>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false): Promise<T> {
+  const method = (options.method || 'GET').toUpperCase();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   };
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  // Injection automatique du jeton CSRF pour les méthodes modificatrices
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    const csrfToken = getCsrfToken();
+    if (csrfToken && !headers['X-CSRF-Token']) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
   }
 
   const url = `${API_BASE_URL}${endpoint}`;
 
   try {
     const response = await fetch(url, {
-      credentials: 'include',
+      credentials: 'include', // Envoie et reçoit systématiquement les cookies HttpOnly
       ...options,
       headers,
     });
+
+    // Gestion du rafraîchissement transparent en cas d'access token expiré (401)
+    if (response.status === 401 && !isRetry) {
+      const isAuthEndpoint = ['/auth/login', '/auth/register', '/auth/demo-login', '/auth/refresh', '/auth/logout'].some(ep => endpoint.includes(ep));
+      if (!isAuthEndpoint) {
+        try {
+          console.log('[API Client] Jeton d\'accès expiré (401). Tentative de rafraîchissement transparent...');
+          await authAPI.refreshToken();
+          // Réessayer la requête originale avec la nouvelle session
+          return await apiRequest<T>(endpoint, options, true);
+        } catch (refreshErr) {
+          console.warn('[API Client] Échec du rafraîchissement de session. Déconnexion locale.');
+          clearStoredSession();
+          throw new Error('Session expirée. Veuillez vous reconnecter.');
+        }
+      }
+    }
 
     if (!response.ok) {
       let errorMessage = `Erreur HTTP ${response.status}`;
@@ -119,7 +167,9 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
       } catch {
         // use fallback message
       }
-      throw new Error(errorMessage);
+      const err: any = new Error(errorMessage);
+      err.status = response.status;
+      throw err;
     }
 
     return (await response.json()) as T;
@@ -141,6 +191,7 @@ export const authAPI = {
       email: string;
       role: UserRole;
       full_name: string;
+      csrf_token?: string;
     }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
@@ -151,7 +202,6 @@ export const authAPI = {
       email: res.email,
       role: res.role,
       fullName: res.full_name,
-      token: res.access_token,
     };
 
     setStoredSession(session);
@@ -166,6 +216,7 @@ export const authAPI = {
       email: string;
       role: UserRole;
       full_name: string;
+      csrf_token?: string;
     }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({
@@ -183,7 +234,6 @@ export const authAPI = {
       email: res.email,
       role: res.role,
       fullName: res.full_name,
-      token: res.access_token,
     };
 
     setStoredSession(session);
@@ -199,6 +249,7 @@ export const authAPI = {
         email: string;
         role: UserRole;
         full_name: string;
+        csrf_token?: string;
       }>('/auth/demo-login', {
         method: 'POST',
         body: JSON.stringify({ role }),
@@ -209,7 +260,6 @@ export const authAPI = {
         email: res.email,
         role: res.role,
         fullName: res.full_name,
-        token: res.access_token,
       };
 
       setStoredSession(session);
@@ -228,15 +278,49 @@ export const authAPI = {
         email: info.email,
         role: info.role,
         fullName: info.fullName,
-        token: `demo_token_${Date.now()}`,
       };
       setStoredSession(fallbackSession);
       return fallbackSession;
     }
   },
 
+  refreshToken: async (): Promise<void> => {
+    await apiRequest('/auth/refresh', { method: 'POST' });
+  },
+
   getMe: async (): Promise<any> => {
     return await apiRequest('/auth/me');
+  },
+
+  getSessionStatus: async (): Promise<{ authenticated: boolean; user?: any; csrf_token?: string }> => {
+    return await apiRequest('/auth/session');
+  },
+
+  changePassword: async (oldPassword: string, newPassword: string): Promise<any> => {
+    return await apiRequest('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        old_password: oldPassword,
+        new_password: newPassword,
+      }),
+    });
+  },
+
+  forgotPassword: async (email: string): Promise<any> => {
+    return await apiRequest('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  resetPassword: async (token: string, newPassword: string): Promise<any> => {
+    return await apiRequest('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        token,
+        new_password: newPassword,
+      }),
+    });
   },
 
   logout: async (): Promise<void> => {
@@ -244,6 +328,15 @@ export const authAPI = {
       await apiRequest('/auth/logout', { method: 'POST' });
     } catch {
       // Ignore network errors on logout
+    }
+    clearStoredSession();
+  },
+
+  logoutAll: async (): Promise<void> => {
+    try {
+      await apiRequest('/auth/logout-all', { method: 'POST' });
+    } catch {
+      // Ignore network errors
     }
     clearStoredSession();
   },
@@ -257,6 +350,8 @@ export const authAPI = {
     }
   },
 };
+
+export const authApi = authAPI;
 
 // ==========================================
 // 2. PARENTS & CHILDREN API
@@ -629,27 +724,20 @@ export const paymentsAPI = {
       const res = await apiRequest<{ status: string; is_successful?: boolean }>(`/payments/verify/${transactionId}`);
       return res;
     } catch (err) {
-      // En mode hors-ligne / démo, vérifie si la confirmation manuelle de test a été activée
-      const isConfirmed = localStorage.getItem(`tx_verified_${transactionId}`);
-      if (isConfirmed === 'true') {
-        return {
-          status: 'SUCCESS',
-          is_successful: true,
-          transaction_id: transactionId,
-          message: 'Paiement Mobile Money validé avec succès !',
-        };
-      }
       return {
         status: 'PENDING',
         is_successful: false,
         transaction_id: transactionId,
-        message: 'Transaction toujours en attente de validation USSD sur votre téléphone.',
+        message: 'Transaction en cours de traitement par l\'opérateur.',
       };
     }
   },
 
   confirmDemoPayment: (transactionId: string) => {
-    localStorage.setItem(`tx_verified_${transactionId}`, 'true');
+    // Réservé aux tests manuels administrateurs
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      localStorage.setItem(`tx_verified_${transactionId}`, 'true');
+    }
   },
 
   // Intégration officielle OpenPay Congo (MTN MoMo & Airtel Money)
@@ -658,61 +746,88 @@ export const paymentsAPI = {
     tier: 'FAMILY' | 'CLAN_DIASPORA';
     billingCycle: 'monthly' | 'yearly';
     method: 'MTN_MOMO' | 'AIRTEL_MONEY' | 'VISA_MASTERCARD';
-    phoneNumber: string;
+    phoneNumber?: string;
     amountFcfa: number;
+    userId?: string;
     customerName?: string;
     customerEmail?: string;
   }) => {
+    // Résolution exacte de l'identifiant du forfait en base
+    const isYearly = payload.billingCycle === 'yearly';
+    let exactPlanId = payload.planId;
+    if (exactPlanId === 'plan_family' || payload.tier === 'FAMILY') {
+      exactPlanId = isYearly ? 'plan_family_annual' : 'plan_family_monthly';
+    } else if (exactPlanId === 'plan_clan' || payload.tier === 'CLAN_DIASPORA') {
+      exactPlanId = isYearly ? 'plan_clan_annual' : 'plan_clan_monthly';
+    }
+
+    const session = getStoredSession();
+    const resolvedUserId = payload.userId || (session ? session.id : undefined);
+    const isCard = payload.method === 'VISA_MASTERCARD';
+
+    const bodyPayload = {
+      plan_id: exactPlanId,
+      tier: payload.tier,
+      billing_cycle: payload.billingCycle,
+      method: payload.method,
+      phone_number: payload.phoneNumber || (isCard ? '' : '242060000000'),
+      amount_fcfa: payload.amountFcfa,
+      user_id: resolvedUserId,
+      customer_name: payload.customerName,
+      customer_email: payload.customerEmail,
+    };
+
+    // 1. Tente l'endpoint dédié OpenPay
     try {
       const res = await apiRequest<any>('/payments/openpay/initiate', {
         method: 'POST',
-        body: JSON.stringify({
-          plan_id: payload.planId,
-          tier: payload.tier,
-          billing_cycle: payload.billingCycle,
-          method: payload.method,
-          phone_number: payload.phoneNumber,
-          amount_fcfa: payload.amountFcfa,
-          customer_name: payload.customerName,
-          customer_email: payload.customerEmail,
-        }),
+        body: JSON.stringify(bodyPayload),
       });
       return res;
-    } catch (err: any) {
-      // Fallback simulation locale si le serveur backend n'est pas actif
-      const txId = `tx_op_${Date.now()}`;
-      const refCode = `OP-${Date.now().toString().slice(-6)}`;
-      const ussdGuide = payload.method === 'MTN_MOMO' ? '*105#' : '*128#';
-      return {
-        status: 'PENDING',
-        transaction_id: txId,
-        reference_code: refCode,
-        amount_fcfa: payload.amountFcfa,
-        operator: payload.method === 'MTN_MOMO' ? 'MTN MoMo Congo' : 'Airtel Money Congo',
-        provider: payload.method === 'MTN_MOMO' ? 'MTN' : 'AIRTEL',
-        phone_number: payload.phoneNumber,
-        ussd_instruction: `Composez votre code secret sur votre téléphone (${ussdGuide}) pour valider le paiement de ${payload.amountFcfa.toLocaleString()} FCFA.`,
-      };
+    } catch {
+      // 2. Fallback sur l'endpoint MoMo direct si openpay/initiate n'est pas encore déployé
+      try {
+        const momoRes = await apiRequest<any>('/payments/momo/initiate', {
+          method: 'POST',
+          body: JSON.stringify(bodyPayload),
+        });
+        return momoRes;
+      } catch (fallbackErr) {
+        // Fallback local simulation pour test hors-ligne ou démo
+        const refCode = `OP-${Date.now().toString().slice(-6)}`;
+        const txId = `tx_${Date.now()}`;
+        return {
+          success: true,
+          status: 'PENDING',
+          transaction_id: txId,
+          reference_code: refCode,
+          reference: refCode,
+          amount_fcfa: payload.amountFcfa,
+          operator: isCard ? 'Carte Bancaire (Visa / Mastercard)' : (payload.method === 'MTN_MOMO' ? 'MTN MoMo Congo' : 'Airtel Money Congo'),
+          payment_url: isCard ? `https://openpay-cg.com/checkout/${refCode}` : undefined,
+          is_simulated: true,
+        };
+      }
     }
   },
 
   checkOpenPayStatus: async (referenceId: string) => {
     try {
-      return await apiRequest<any>(`/payments/openpay/check/${referenceId}`);
+      // Vérification auprès du endpoint OpenPay
+      const res = await apiRequest<any>(`/payments/openpay/check/${referenceId}`);
+      return res;
     } catch {
-      const isConfirmed = localStorage.getItem(`tx_verified_${referenceId}`);
-      if (isConfirmed === 'true') {
+      // Si la route openpay/check n'est pas disponible, interroge le statut général
+      try {
+        const verifyRes = await apiRequest<any>(`/payments/verify/${referenceId}`);
+        return verifyRes;
+      } catch {
         return {
           reference: referenceId,
-          status: 'SUCCESS',
-          is_successful: true,
+          status: 'PENDING',
+          is_successful: false,
         };
       }
-      return {
-        reference: referenceId,
-        status: 'PENDING',
-        is_successful: false,
-      };
     }
   },
 
@@ -818,6 +933,40 @@ export const paymentsAPI = {
     try {
       localStorage.setItem(SUBSCRIPTION_STORAGE_KEY, JSON.stringify(sub));
     } catch {}
+  },
+
+  getMySubscription: async () => {
+    try {
+      const data = await apiRequest<{
+        is_premium: boolean;
+        tier: 'FREE' | 'FAMILY' | 'CLAN_DIASPORA';
+        plan_id: string;
+        plan_name: string;
+        billing_cycle: 'monthly' | 'yearly';
+        status: string;
+        start_date: string | null;
+        expires_at: string | null;
+        max_children: number;
+        payment_method?: string;
+        auto_renew?: boolean;
+      }>('/payments/my-subscription');
+
+      if (data) {
+        const formatted = {
+          isPremium: Boolean(data.is_premium),
+          tier: data.tier || ('FREE' as const),
+          planName: data.plan_name || 'Découverte (Gratuit)',
+          billingCycle: data.billing_cycle || 'monthly',
+          expiresAt: data.expires_at || '',
+          maxChildren: data.max_children || 1,
+        };
+        paymentsAPI.saveLocalSubscription(formatted);
+        return formatted;
+      }
+    } catch (err) {
+      console.warn('[Payments] Synchronisation abonnement impossible:', err);
+    }
+    return paymentsAPI.getLocalSubscription();
   },
 };
 
@@ -1238,8 +1387,11 @@ export const adminSubscriptionsAPI = {
         localStorage.setItem(ADMIN_SUBS_LOCAL_KEY, JSON.stringify(data));
         return data;
       }
-    } catch {
-      // Fallback
+    } catch (err: any) {
+      if (err?.status === 401 || err?.status === 403) {
+        throw err;
+      }
+      // Fallback only for offline network failures
     }
 
     const localJson = localStorage.getItem(ADMIN_SUBS_LOCAL_KEY);
@@ -1262,8 +1414,11 @@ export const adminSubscriptionsAPI = {
         localStorage.setItem(ADMIN_TX_LOCAL_KEY, JSON.stringify(data));
         return data;
       }
-    } catch {
-      // Fallback
+    } catch (err: any) {
+      if (err?.status === 401 || err?.status === 403) {
+        throw err;
+      }
+      // Fallback only for offline network failures
     }
 
     const localJson = localStorage.getItem(ADMIN_TX_LOCAL_KEY);
@@ -1292,8 +1447,11 @@ export const adminSubscriptionsAPI = {
         }),
       });
       return resp;
-    } catch (err) {
-      // Local simulated grant
+    } catch (err: any) {
+      if (err?.status === 401 || err?.status === 403) {
+        throw err;
+      }
+      // Local simulated grant for offline dev
       const localSubs = (await adminSubscriptionsAPI.getSubscribers()).slice();
       const newSub: AdminSubscriberItem = {
         id: `sub_manual_${Date.now()}`,
@@ -1328,7 +1486,10 @@ export const adminSubscriptionsAPI = {
           extend_months: extendMonths || 0,
         }),
       });
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.status === 401 || err?.status === 403) {
+        throw err;
+      }
       const localSubs = (await adminSubscriptionsAPI.getSubscribers()).map((s) => {
         if (s.id === subId) {
           const newEndDate = extendMonths && extendMonths > 0
@@ -1369,8 +1530,11 @@ export const adminSubscriptionsAPI = {
           user_email: payload.userEmail,
         }),
       });
-    } catch (err) {
-      // Local fallback simulation
+    } catch (err: any) {
+      if (err?.status === 401 || err?.status === 403) {
+        throw err;
+      }
+      // Local fallback simulation for offline dev
       const txs = (await adminSubscriptionsAPI.getTransactions()).slice();
       const ref = `SIM-${payload.provider.slice(0, 3)}-${Date.now().toString().slice(-6)}`;
       const newTx: AdminTransactionItem = {

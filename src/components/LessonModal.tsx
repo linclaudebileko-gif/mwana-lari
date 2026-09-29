@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LessonUnit, WordItem } from '../types';
 import { LARI_WORDS } from '../data/mockData';
-import { playSuccessChime, playErrorSound, playPopSound, playVictoryFanfare, speakNativeWord } from '../utils/audio';
+import { playSuccessChime, playErrorSound, playPopSound, playVictoryFanfare, speakNativeWord, preloadAudio } from '../utils/audio';
+import { useAuth } from '../context/AuthContext';
+import { CertificateModal } from './CertificateModal';
 import {
   X,
   Volume2,
@@ -15,7 +17,8 @@ import {
   RotateCcw,
   Star,
   Award,
-  Heart
+  Heart,
+  GraduationCap
 } from 'lucide-react';
 
 interface LessonModalProps {
@@ -25,6 +28,9 @@ interface LessonModalProps {
 }
 
 export const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose, onComplete }) => {
+  const { activeChild } = useAuth();
+  const [isCertificateOpen, setIsCertificateOpen] = useState(false);
+
   // 1. Get words matching lesson topic
   const getWordsForLesson = (): WordItem[] => {
     let filtered: WordItem[] = [];
@@ -59,6 +65,13 @@ export const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose, onCom
   };
 
   const lessonWords = getWordsForLesson();
+  
+  // Preload all lesson words audio into memory for instantaneous response
+  useEffect(() => {
+    lessonWords.forEach((w) => {
+      preloadAudio(w.audioUrl || w.wordNative);
+    });
+  }, [lessonWords]);
   
   // State Steps: 'discovery' -> 'quiz' -> 'completed'
   const [step, setStep] = useState<'discovery' | 'quiz' | 'completed'>('discovery');
@@ -216,7 +229,7 @@ export const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose, onCom
 
                 {/* Audio Button */}
                 <button
-                  onClick={() => speakNativeWord(currentWord.wordNative)}
+                  onClick={() => speakNativeWord(currentWord.wordNative, currentWord.audioUrl)}
                   className="mt-5 px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold shadow-lg shadow-amber-500/30 flex items-center gap-2.5 transition-all transform hover:scale-105 active:scale-95"
                 >
                   <Volume2 className="w-5 h-5 animate-pulse" />
@@ -370,18 +383,49 @@ export const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose, onCom
                 </div>
               </div>
 
-              <button
-                onClick={handleFinishLesson}
-                className="w-full max-w-sm mx-auto py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black text-base shadow-xl shadow-amber-500/30 transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
-              >
-                <Trophy className="w-5 h-5" />
-                <span>Encaisser mes Points & Continuer</span>
-              </button>
+              <div className="flex flex-col gap-2.5 max-w-sm mx-auto pt-1">
+                <button
+                  onClick={handleFinishLesson}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black text-base shadow-xl shadow-amber-500/30 transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <Trophy className="w-5 h-5" />
+                  <span>Encaisser mes Points & Continuer</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSuccessChime();
+                    setIsCertificateOpen(true);
+                  }}
+                  className="w-full py-2.5 rounded-2xl bg-white hover:bg-amber-50 border-2 border-amber-300 text-amber-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-1.5 active:scale-95"
+                >
+                  <GraduationCap className="w-4 h-4 text-amber-700" />
+                  <span>Voir & Imprimer mon Diplôme (PDF)</span>
+                </button>
+              </div>
             </div>
           )}
 
         </div>
       </div>
+
+      {/* Official Certificate Modal */}
+      {isCertificateOpen && (
+        <CertificateModal
+          isOpen={isCertificateOpen}
+          onClose={() => setIsCertificateOpen(false)}
+          data={{
+            recipientName: activeChild?.firstName || 'Mwana Lari',
+            level: lesson.level || 1,
+            levelTitle: `LEÇON VALIDÉE — ${lesson.titleFr.toUpperCase()}`,
+            xpPoints: (activeChild?.xpPoints || 100) + 60 + quizScore * 10,
+            streakDays: activeChild?.streakDays || 5,
+            wordsLearned: lesson.wordCount || 10,
+          }}
+        />
+      )}
+
     </div>
   );
 };

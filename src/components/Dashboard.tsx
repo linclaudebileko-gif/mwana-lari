@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ChildProfile, LessonUnit } from '../types';
 import { KokoMascot } from './KokoMascot';
 import { LessonModal } from './LessonModal';
+import { CertificateModal } from './CertificateModal';
 import { LESSON_UNITS } from '../data/mockData';
 import { lessonsAPI } from '../services/api';
 import {
@@ -19,6 +20,8 @@ import {
   Database,
   RefreshCw,
   Sparkles,
+  GraduationCap,
+  Printer
 } from 'lucide-react';
 import { playSuccessChime } from '../utils/audio';
 
@@ -35,6 +38,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, onEarnXp, onNavig
   const [loadingLessons, setLoadingLessons] = useState(false);
   const [isFromDB, setIsFromDB] = useState(false);
   const [activeLessonModal, setActiveLessonModal] = useState<LessonUnit | null>(null);
+  const [isCertificateOpen, setIsCertificateOpen] = useState(false);
 
   const handleNavigate = (tab: any) => {
     if (onSelectTab) onSelectTab(tab);
@@ -185,6 +189,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, onEarnXp, onNavig
 
       </div>
 
+      {/* Official Certificate Achievement Banner */}
+      <div className="glass-card-amber rounded-3xl p-4 sm:p-5 border-2 border-amber-400 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3.5">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center text-white text-2xl sm:text-3xl shadow-lg shadow-amber-500/30 flex-shrink-0 animate-pulse">
+            🏆
+          </div>
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-950 font-black text-[10px] uppercase tracking-wider">
+                Diplôme Officiel Prêt
+              </span>
+              <span className="text-[11px] font-bold text-amber-900 hidden xs:inline">
+                • Standard MBUTA
+              </span>
+            </div>
+            <h3 className="font-black text-base sm:text-lg text-savanna-950">
+              Diplôme « Mwana ya Mayele » (Niveau {profile.level})
+            </h3>
+            <p className="text-xs text-savanna-800 font-medium">
+              Félicitations <strong>{profile.firstName}</strong> ! Tu as validé <strong>{profile.xpPoints} XP</strong> et <strong>{profile.streakDays} jours de série</strong>. Ton diplôme officiel est disponible pour impression ou encadrement !
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => {
+            playSuccessChime();
+            setIsCertificateOpen(true);
+          }}
+          className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-600 via-brand-600 to-amber-600 hover:brightness-110 text-white font-black text-xs shadow-lg shadow-amber-600/30 flex items-center justify-center gap-2 flex-shrink-0 active:scale-95 transition-all self-start sm:self-auto"
+        >
+          <GraduationCap className="w-4 h-4" />
+          <span>Voir mon Diplôme (PDF)</span>
+        </button>
+      </div>
+
       {/* Learning Roadmap / Académie du Lari */}
       <div className="glass-card rounded-3xl p-4 sm:p-6 border-2 border-brand-300 shadow-xl space-y-4 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -292,6 +332,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ profile, onEarnXp, onNavig
           onComplete={handleLessonCompleted}
         />
       )}
+
+      {/* Official Certificate Modal */}
+      <CertificateModal
+        isOpen={isCertificateOpen}
+        onClose={() => setIsCertificateOpen(false)}
+        data={{
+          recipientName: profile.firstName,
+          level: profile.level,
+          xpPoints: profile.xpPoints,
+          streakDays: profile.streakDays,
+          wordsLearned: 50 + profile.level * 25,
+        }}
+      />
 
     </div>
   );

@@ -1,4 +1,5 @@
 import { getPendingSyncQueue, removePendingSyncItem } from './offlineStorage';
+import { getCsrfToken, API_BASE_URL } from '../services/api';
 
 type NetworkStatusCallback = (isOnline: boolean) => void;
 type UpdateAvailableCallback = (version: string) => void;
@@ -156,18 +157,19 @@ export const syncPendingProgressWithBackend = async (): Promise<{ synced: number
   let synced = 0;
   let failed = 0;
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('mwana_lari_token') : null;
+  const csrfToken = getCsrfToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json'
   };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  if (csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken;
   }
 
   for (const item of queue) {
     try {
-      const response = await fetch('/api/v1/progress/submit', {
+      const response = await fetch(`${API_BASE_URL}/progress/submit`, {
         method: 'POST',
+        credentials: 'include',
         headers,
         body: JSON.stringify({
           child_id: item.childId,
@@ -193,3 +195,106 @@ export const syncPendingProgressWithBackend = async (): Promise<{ synced: number
 
   return { synced, failed };
 };
+
+// ----------------------------------------------------
+// PWA Installation & Prompt Management
+// ----------------------------------------------------
+let deferredInstallPrompt: any = null;
+const installListeners: Array<(canInstall: boolean) => void> = [];
+
+export const isPwaInstalled = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+  const isNavigatorStandalone = (window.navigator as any).standalone === true;
+  return isStandalone || isNavigatorStandalone;
+};
+
+export const isIosDevice = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const ua = window.navigator.userAgent.toLowerCase();
+  return /iphone|ipad|ipod/.test(ua);
+};
+
+export const isIosSafari = (): boolean => {
+  if (!isIosDevice()) return false;
+  const ua = window.navigator.userAgent.toLowerCase();
+  return ua.includes('safari') && !ua.includes('crios') && !ua.includes('fxios');
+};
+
+export const addInstallPromptListener = (cb: (canInstall: boolean) => void): (() => void) => {
+  installListeners.push(cb);
+  // Send immediate state if prompt already caught
+  cb(!!deferredInstallPrompt);
+  return () => {
+    const idx = installListeners.indexOf(cb);
+    if (idx !== -1) installListeners.splice(idx, 1);
+  };
+};
+
+const notifyInstallListeners = (canInstall: boolean) => {
+  installListeners.forEach((cb) => {
+    try {
+      cb(canInstall);
+    } catch (e) {
+      console.error('Erreur install listener:', e);
+    }
+  });
+};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (e: Event) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    console.log('📲 [PWA] Événement beforeinstallprompt intercepté !');
+    notifyInstallListeners(true);
+  });
+
+  window.addEventListener('appinstalled', () => {
+    console.log('🎉 [PWA] Application Mwana Lari installée avec succès !');
+    deferredInstallPrompt = null;
+    notifyInstallListeners(false);
+    localStorage.setItem('mwana_lari_pwa_installed', 'true');
+  });
+}
+
+export const canPromptPwaInstall = (): boolean => {
+  return !!deferredInstallPrompt;
+};
+
+export const promptPwaInstall = async (): Promise<'accepted' | 'dismissed' | 'unavailable'> => {
+  if (!deferredInstallPrompt) {
+    return 'unavailable';
+  }
+
+  try {
+    deferredInstallPrompt.prompt();
+    const choiceResult = await deferredInstallPrompt.userChoice;
+    console.log('📲 [PWA] Choix d\'installation de l\'utilisateur:', choiceResult.outcome);
+    if (choiceResult.outcome === 'accepted') {
+      deferredInstallPrompt = null;
+      notifyInstallListeners(false);
+      return 'accepted';
+    } else {
+      return 'dismissed';
+    }
+  } catch (err) {
+    console.warn('⚠️ [PWA] Erreur lors du prompt d\'installation:', err);
+    return 'unavailable';
+  }
+};
+
+const DISMISS_PWA_KEY = 'mwana_lari_pwa_install_dismissed_until';
+
+export const isPwaInstallDismissed = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const dismissedUntil = localStorage.getItem(DISMISS_PWA_KEY);
+  if (!dismissedUntil) return false;
+  return Date.now() < parseInt(dismissedUntil, 10);
+};
+
+export const dismissPwaInstall = (days: number = 7): void => {
+  if (typeof window === 'undefined') return;
+  const expireAt = Date.now() + days * 24 * 60 * 60 * 1000;
+  localStorage.setItem(DISMISS_PWA_KEY, expireAt.toString());
+};
+

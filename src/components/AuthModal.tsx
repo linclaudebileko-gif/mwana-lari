@@ -79,8 +79,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    if (password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères.');
+    if (password.length < 12) {
+      setError('Le mot de passe doit comporter au moins 12 caractères (les phrases de passe et gestionnaires sont recommandés).');
       return;
     }
 
@@ -233,6 +233,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
+                    autoComplete="current-password"
                     className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-savanna-50/70 border-2 border-brand-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500"
                     required
                   />
@@ -369,11 +370,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Minimum 6 caractères"
+                  placeholder="Minimum 12 caractères ou phrase de passe"
+                  autoComplete="new-password"
                   className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-savanna-50/70 border-2 border-brand-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500"
                   required
                 />
               </div>
+              <p className="text-[11px] text-savanna-600 mt-1">
+                🛡️ Min. 12 caractères. Les gestionnaires de mots de passe, le copier/coller et les phrases de passe sont recommandés.
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">

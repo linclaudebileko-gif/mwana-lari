@@ -16,6 +16,7 @@ export const AudioLab: React.FC = () => {
   const handlePlayAudio = () => {
     setIsPlayingAudio(true);
     playLariWordAudio(currentWord.wordNative, {
+      customAudioUrl: currentWord.audioUrl,
       playbackRate: playbackSpeed,
       onEnd: () => setIsPlayingAudio(false),
     });

@@ -26,7 +26,23 @@ function isValidEmail(email) {
   return re.test(email.trim()) && email.length <= 100;
 }
 
-function sanitizeInput(str) {
+function escapeHtml(str) {
+  if (typeof str !== 'string') return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function sanitizeHeaderField(str) {
+  if (typeof str !== 'string') return '';
+  // Strip newlines, carriage returns and control characters to prevent header injection
+  return str.replace(/[\r\n\t\0\x08\x0b\x0c]/g, ' ').replace(/[<>]/g, '').trim();
+}
+
+function sanitizeMessageBody(str) {
   if (typeof str !== 'string') return '';
   return str.replace(/[<>]/g, '').trim();
 }
@@ -39,7 +55,7 @@ export default async function handler(req, res) {
   }
 
   // 2. Protection Anti-Abus : Rate Limiting
-  const clientIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
+  const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
   if (isRateLimited(clientIp)) {
     return res.status(429).json({ 
       error: 'Trop de requêtes. Veuillez patienter une minute avant de réessayer.' 
@@ -56,10 +72,10 @@ export default async function handler(req, res) {
     }
 
     // 4. Validation stricte des données entrantes
-    const cleanName = sanitizeInput(name);
-    const cleanEmail = typeof email === 'string' ? email.trim() : '';
-    const cleanSubject = sanitizeInput(subject) || 'Nouveau message de contact Mwana Lari';
-    const cleanMessage = sanitizeInput(message);
+    const cleanName = sanitizeHeaderField(name);
+    const cleanEmail = typeof email === 'string' ? email.replace(/[\r\n]/g, '').trim() : '';
+    const cleanSubject = sanitizeHeaderField(subject) || 'Nouveau message de contact Mwana Lari';
+    const cleanMessage = sanitizeMessageBody(message);
 
     if (!cleanName || cleanName.length < 2 || cleanName.length > 100) {
       return res.status(400).json({ error: 'Le nom doit comporter entre 2 et 100 caractères.' });
@@ -116,10 +132,10 @@ export default async function handler(req, res) {
         html: `
           <div style="font-family: sans-serif; line-height: 1.6; color: #1e1b4b; padding: 20px;">
             <h2 style="color: #ea580c;">Nouveau message depuis Mwana Lari</h2>
-            <p><strong>Expéditeur :</strong> ${cleanName} (&lt;${cleanEmail}&gt;)</p>
-            <p><strong>Objet :</strong> ${cleanSubject}</p>
+            <p><strong>Expéditeur :</strong> ${escapeHtml(cleanName)} (&lt;${escapeHtml(cleanEmail)}&gt;)</p>
+            <p><strong>Objet :</strong> ${escapeHtml(cleanSubject)}</p>
             <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #ea580c; margin-top: 15px;">
-              <p style="white-space: pre-wrap; margin: 0;">${cleanMessage}</p>
+              <p style="white-space: pre-wrap; margin: 0;">${escapeHtml(cleanMessage)}</p>
             </div>
           </div>
         `,

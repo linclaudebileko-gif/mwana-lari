@@ -1,9 +1,9 @@
-const CACHE_NAME_STATIC = 'mwana-lari-static-v3.1';
-const CACHE_NAME_AUDIO = 'mwana-lari-audio-v3.1';
+const CACHE_NAME_STATIC = 'mwana-lari-static-v3.2';
+const CACHE_NAME_AUDIO = 'mwana-lari-audio-v3.2';
 
 // Installation event: Pre-cache core shell
 self.addEventListener('install', (event) => {
-  console.log('[Service Worker v3.1] Installation...');
+  console.log('[Service Worker v3.2] Installation...');
   self.skipWaiting();
 });
 

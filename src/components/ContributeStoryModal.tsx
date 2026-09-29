@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { heritageAPI } from '../services/api';
 import { CulturalStory } from '../types';
-import { X, Mic, Square, Play, Pause, Volume2, Sparkles, CheckCircle2, AlertCircle, Send, MapPin, User } from 'lucide-react';
+import { X, Mic, Square, Play, Pause, Volume2, Sparkles, CheckCircle2, AlertCircle, Send, MapPin, User, Upload, Trash2 } from 'lucide-react';
 import { playSuccessChime } from '../utils/audio';
 
 interface ContributeStoryModalProps {
@@ -24,16 +24,18 @@ export const ContributeStoryModal: React.FC<ContributeStoryModalProps> = ({
   const [originLocation, setOriginLocation] = useState('Brazzaville (Bacongo)');
   const [moralLesson, setMoralLesson] = useState('');
 
-  // Audio Recording State
+  // Audio Recording & Import State
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioFileName, setAudioFileName] = useState<string | null>(null);
   const [isPlayingRecordedAudio, setIsPlayingRecordedAudio] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +45,12 @@ export const ContributeStoryModal: React.FC<ContributeStoryModalProps> = ({
     if (!isOpen) {
       // Reset state on close
       if (isRecording) stopRecording();
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+        audioPlayerRef.current = null;
+      }
       setAudioUrl(null);
+      setAudioFileName(null);
       setIsPlayingRecordedAudio(false);
       setRecordingTime(0);
       setError(null);
@@ -52,6 +59,26 @@ export const ContributeStoryModal: React.FC<ContributeStoryModalProps> = ({
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  // Handle local file import (WAV, MP3, M4A, OGG, WEBM)
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('audio/') && !/\.(wav|mp3|m4a|ogg|webm)$/i.test(file.name)) {
+      setError('Format audio non supporté. Veuillez sélectionner un fichier .wav, .mp3, .m4a ou .ogg.');
+      return;
+    }
+
+    setAudioFileName(file.name);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAudioUrl(reader.result as string);
+      setRecordingTime(120);
+      setError(null);
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Start microphone recording
   const startRecording = async () => {
@@ -74,8 +101,8 @@ export const ContributeStoryModal: React.FC<ContributeStoryModalProps> = ({
         reader.readAsDataURL(audioBlob);
         reader.onloadend = () => {
           setAudioUrl(reader.result as string);
+          setAudioFileName(`enregistrement_conte_${Date.now()}.webm`);
         };
-        // Stop all audio tracks to release microphone
         stream.getTracks().forEach((track) => track.stop());
       };
 
@@ -88,7 +115,7 @@ export const ContributeStoryModal: React.FC<ContributeStoryModalProps> = ({
       }, 1000);
     } catch (err: any) {
       console.warn('Microphone access error:', err);
-      setError('Impossible d\'accéder au microphone. Veuillez autoriser l\'accès micro sur votre navigateur.');
+      setError('Impossible d\'accéder au microphone. Vous pouvez importer un fichier audio ci-dessous.');
     }
   };
 
@@ -101,22 +128,39 @@ export const ContributeStoryModal: React.FC<ContributeStoryModalProps> = ({
     }
   };
 
-  // Play / Pause preview of recorded voice
+  // Play / Pause preview of recorded/imported voice
   const togglePlayRecordedAudio = () => {
     if (!audioUrl) return;
 
-    if (!audioPlayerRef.current) {
+    if (!audioPlayerRef.current || audioPlayerRef.current.src !== audioUrl) {
       audioPlayerRef.current = new Audio(audioUrl);
       audioPlayerRef.current.onended = () => setIsPlayingRecordedAudio(false);
+      audioPlayerRef.current.onerror = () => setIsPlayingRecordedAudio(false);
     }
 
     if (isPlayingRecordedAudio) {
       audioPlayerRef.current.pause();
       setIsPlayingRecordedAudio(false);
     } else {
-      audioPlayerRef.current.play();
-      setIsPlayingRecordedAudio(true);
+      audioPlayerRef.current.play().then(() => {
+        setIsPlayingRecordedAudio(true);
+      }).catch((err) => {
+        console.warn('Play error:', err);
+        setIsPlayingRecordedAudio(false);
+      });
     }
+  };
+
+  const handleRemoveAudio = () => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current = null;
+    }
+    setAudioUrl(null);
+    setAudioFileName(null);
+    setIsPlayingRecordedAudio(false);
+    setRecordingTime(0);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -196,7 +240,7 @@ export const ContributeStoryModal: React.FC<ContributeStoryModalProps> = ({
             Studio Vocal des Bambuta (Aînés)
           </h2>
           <p className="text-xs text-forest-900 font-medium">
-            Enregistrez et transmettez les contes, proverbes et sagesses Lari des aînés
+            Enregistrez ou importez les contes, proverbes et sagesses Lari des aînés
           </p>
         </div>
 
@@ -256,13 +300,13 @@ export const ContributeStoryModal: React.FC<ContributeStoryModalProps> = ({
             </div>
           </div>
 
-          {/* STUDIO D'ENREGISTREMENT MICROPHONE HD */}
+          {/* STUDIO D'ENREGISTREMENT & IMPORTATION AUDIO */}
           <div className="p-4 rounded-2xl bg-gradient-to-r from-brand-100 via-amber-100 to-forest-100 border border-brand-300 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-sm">🎙️</span>
                 <span className="text-xs font-extrabold text-savanna-950">
-                  Enregistrement Vocal Réel (Microphone)
+                  Voix de l'Aîné(e) (Microphone ou Fichier)
                 </span>
               </div>
               {isRecording && (
@@ -273,43 +317,84 @@ export const ContributeStoryModal: React.FC<ContributeStoryModalProps> = ({
               )}
             </div>
 
-            <div className="flex items-center gap-3">
-              {!isRecording ? (
-                <button
-                  type="button"
-                  onClick={startRecording}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-forest-600 hover:bg-forest-700 text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
-                >
-                  <Mic className="w-4 h-4 text-brand-300" />
-                  <span>{audioUrl ? 'Réenregistrer la voix' : 'Démarrer l\'enregistrement'}</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={stopRecording}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-md animate-pulse transition-all active:scale-95"
-                >
-                  <Square className="w-4 h-4 fill-white" />
-                  <span>Arrêter l'enregistrement ({formatTime(recordingTime)})</span>
-                </button>
-              )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".wav,.mp3,.m4a,.ogg,.webm,audio/*"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
 
-              {audioUrl && !isRecording && (
+            {!audioUrl ? (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="py-2.5 px-3 rounded-xl bg-white hover:bg-forest-50 border border-forest-300 text-forest-900 text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                >
+                  <Upload className="w-3.5 h-3.5 text-forest-600" />
+                  <span>Importer un fichier audio</span>
+                </button>
+
+                {!isRecording ? (
+                  <button
+                    type="button"
+                    onClick={startRecording}
+                    className="py-2.5 px-3 rounded-xl bg-forest-600 hover:bg-forest-700 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95"
+                  >
+                    <Mic className="w-3.5 h-3.5 text-brand-300" />
+                    <span>Enregistrer au micro</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={stopRecording}
+                    className="py-2.5 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-md animate-pulse"
+                  >
+                    <Square className="w-3.5 h-3.5 fill-white" />
+                    <span>Arrêter ({formatTime(recordingTime)})</span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between bg-white/90 p-2.5 rounded-xl border border-forest-300 shadow-sm gap-2">
                 <button
                   type="button"
                   onClick={togglePlayRecordedAudio}
-                  className="py-2.5 px-4 rounded-xl bg-brand-500 hover:bg-brand-600 text-savanna-950 text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition-all"
-                  title="Écouter l'enregistrement"
+                  className="px-3 py-1.5 rounded-lg bg-forest-600 hover:bg-forest-700 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition-all"
                 >
-                  {isPlayingRecordedAudio ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                  <span>{isPlayingRecordedAudio ? 'Pause' : 'Écouter'}</span>
+                  {isPlayingRecordedAudio ? (
+                    <>
+                      <Pause className="w-3.5 h-3.5 fill-white" />
+                      <span>Pause</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-3.5 h-3.5 fill-white" />
+                      <span>Écouter le récit</span>
+                    </>
+                  )}
                 </button>
-              )}
-            </div>
+
+                <span className="text-[11px] font-bold text-forest-950 truncate flex-1 px-1">
+                  {audioFileName || 'Enregistrement vocal attaché'}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={handleRemoveAudio}
+                  className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Supprimer l'audio"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
             {audioUrl && (
               <p className="text-[11px] text-forest-900 font-semibold flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5 text-forest-600" />
-                Voix de l'aîné(e) capturée et prête à être partagée !
+                Voix de l'aîné(e) capturée et prête à être transmise !
               </p>
             )}
           </div>
@@ -353,8 +438,8 @@ export const ContributeStoryModal: React.FC<ContributeStoryModalProps> = ({
                 type="text"
                 value={elderSpeakerName}
                 onChange={(e) => setElderSpeakerName(e.target.value)}
-                placeholder="ex: Mbuta Papa André"
-                className="w-full px-3.5 py-2 rounded-xl bg-savanna-50/70 border border-forest-300 text-sm font-bold text-savanna-950 focus:outline-none focus:ring-2 focus:ring-forest-500"
+                placeholder="ex: Mbuta Papa Jean-Baptiste"
+                className="w-full px-3.5 py-2 rounded-xl bg-savanna-50/70 border border-forest-300 text-xs font-bold text-savanna-950 focus:outline-none focus:ring-2 focus:ring-forest-500"
                 required
               />
             </div>
@@ -362,34 +447,28 @@ export const ContributeStoryModal: React.FC<ContributeStoryModalProps> = ({
             <div>
               <label className="block text-xs font-extrabold text-savanna-900 mb-1 flex items-center gap-1">
                 <MapPin className="w-3 h-3 text-forest-700" />
-                Quartier / Région
+                Origine / Quartier
               </label>
-              <select
+              <input
+                type="text"
                 value={originLocation}
                 onChange={(e) => setOriginLocation(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl bg-savanna-50/70 border border-forest-300 text-xs font-bold text-savanna-950 focus:outline-none focus:ring-2 focus:ring-forest-500"
-              >
-                <option value="Brazzaville (Bacongo)">Brazzaville (Bacongo)</option>
-                <option value="Brazzaville (Makelekele)">Brazzaville (Makelekele)</option>
-                <option value="Pool (Kinkala)">Pool (Kinkala)</option>
-                <option value="Pool (Mindouli / Boko)">Pool (Mindouli / Boko)</option>
-                <option value="Pointe-Noire">Pointe-Noire</option>
-                <option value="Diaspora (France / Europe)">Diaspora (France / Europe)</option>
-                <option value="Diaspora (Canada / USA)">Diaspora (Canada / USA)</option>
-              </select>
+                placeholder="ex: Brazzaville (Bacongo)"
+                className="w-full px-3.5 py-2 rounded-xl bg-savanna-50/70 border border-forest-300 text-xs font-medium text-savanna-950 focus:outline-none focus:ring-2 focus:ring-forest-500"
+              />
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-extrabold text-savanna-900 mb-1">
-              Texte complet en Lari *
+              Texte du Récit en Lari *
             </label>
             <textarea
-              rows={3}
               value={contentNative}
               onChange={(e) => setContentNative(e.target.value)}
-              placeholder="Écrivez le texte ou la transcription en Lari..."
-              className="w-full px-3.5 py-2 rounded-xl bg-savanna-50/70 border border-forest-300 text-sm font-medium text-savanna-950 focus:outline-none focus:ring-2 focus:ring-forest-500 resize-none"
+              placeholder="Rédigez ou transcrivez le proverbe ou conte en Lari..."
+              rows={3}
+              className="w-full px-3.5 py-2 rounded-xl bg-savanna-50/70 border border-forest-300 text-xs font-medium text-savanna-950 focus:outline-none focus:ring-2 focus:ring-forest-500 resize-none"
               required
             />
           </div>
@@ -399,44 +478,41 @@ export const ContributeStoryModal: React.FC<ContributeStoryModalProps> = ({
               Traduction / Explication en Français
             </label>
             <textarea
-              rows={2}
               value={contentFr}
               onChange={(e) => setContentFr(e.target.value)}
-              placeholder="Traduction pour les enfants et la famille..."
-              className="w-full px-3.5 py-2 rounded-xl bg-savanna-50/70 border border-forest-300 text-sm font-medium text-savanna-950 focus:outline-none focus:ring-2 focus:ring-forest-500 resize-none"
+              placeholder="Sens général et traduction en français..."
+              rows={2}
+              className="w-full px-3.5 py-2 rounded-xl bg-savanna-50/70 border border-forest-300 text-xs font-medium text-savanna-950 focus:outline-none focus:ring-2 focus:ring-forest-500 resize-none"
             />
           </div>
 
           <div>
             <label className="block text-xs font-extrabold text-savanna-900 mb-1">
-              Leçon de Morale / Sagesse (Mayele)
+              Leçon Morale / Sagesse Transmise
             </label>
             <input
               type="text"
               value={moralLesson}
               onChange={(e) => setMoralLesson(e.target.value)}
-              placeholder="ex: Toujours cultiver la solidarité et le respect"
+              placeholder="ex: La solidarité est le pilier du clan..."
               className="w-full px-3.5 py-2 rounded-xl bg-savanna-50/70 border border-forest-300 text-xs font-medium text-savanna-950 focus:outline-none focus:ring-2 focus:ring-forest-500"
             />
           </div>
 
-          <div className="pt-2 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-savanna-300 text-savanna-800 text-xs font-extrabold hover:bg-savanna-100 transition-colors"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={loading || isRecording}
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-forest-600 to-emerald-600 hover:from-forest-700 hover:to-emerald-700 text-white text-xs font-extrabold flex items-center gap-2 shadow-lg shadow-forest-600/30 transition-all active:scale-95 disabled:opacity-50"
-            >
-              <Send className="w-4 h-4" />
-              <span>{loading ? 'Transmission...' : 'Enregistrer dans le Patrimoine'}</span>
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 rounded-2xl bg-gradient-to-r from-forest-600 to-emerald-500 hover:from-forest-700 hover:to-emerald-600 text-white font-extrabold text-sm shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            {loading ? (
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                <span>Transmettre & Enregistrer le Patrimoine</span>
+              </>
+            )}
+          </button>
         </form>
 
       </div>

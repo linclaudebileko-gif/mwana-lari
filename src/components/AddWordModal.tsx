@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { wordsAPI } from '../services/api';
 import { WordItem } from '../types';
-import { X, Plus, BookOpen, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
+import { X, Plus, BookOpen, CheckCircle2, AlertCircle, Sparkles, Upload, Mic, Square, Play, Pause, Trash2, Volume2 } from 'lucide-react';
 import { playSuccessChime } from '../utils/audio';
 
 interface AddWordModalProps {
@@ -10,7 +10,7 @@ interface AddWordModalProps {
   onWordAdded: (word: WordItem) => void;
 }
 
-const CATEGORIES = ['Salutations', 'Famille', 'Maison', 'Nourriture', 'Animaux', 'Nombres', 'Culture', 'Corps Humain', 'Nature'];
+const CATEGORIES = ['Salutations', 'Famille', 'Maison', 'Nourriture', 'Animaux', 'Nombres', 'Culture', 'Corps Humain', 'Nature', 'Actions & Verbes', 'Vocabulaire Général'];
 
 export const AddWordModal: React.FC<AddWordModalProps> = ({ isOpen, onClose, onWordAdded }) => {
   const [wordNative, setWordNative] = useState('');
@@ -24,10 +24,123 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({ isOpen, onClose, onW
   const [exampleSentenceFr, setExampleSentenceFr] = useState('');
   const [speakerName, setSpeakerName] = useState('');
 
+  // Audio import & recording state
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioFileName, setAudioFileName] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [isPlayingPreview, setIsPlayingPreview] = useState(false);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<any>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  // Handle local file upload (WAV, MP3, M4A, OGG, WEBM)
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('audio/') && !/\.(wav|mp3|m4a|ogg|webm)$/i.test(file.name)) {
+      setError('Format audio non supporté. Veuillez sélectionner un fichier .wav, .mp3, .m4a ou .ogg.');
+      return;
+    }
+
+    setAudioFileName(file.name);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAudioUrl(reader.result as string);
+      setError(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Start mic recording
+  const startRecording = async () => {
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setAudioUrl(reader.result as string);
+          setAudioFileName(`enregistrement_vocal_${Date.now()}.webm`);
+        };
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingSeconds(0);
+
+      timerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+    } catch (err: any) {
+      console.warn('Microphone error:', err);
+      setError('Impossible d\'accéder au microphone. Vous pouvez importer un fichier audio ci-dessous.');
+    }
+  };
+
+  // Stop mic recording
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+  };
+
+  // Toggle play audio preview
+  const togglePlayAudio = () => {
+    if (!audioUrl) return;
+
+    if (!previewAudioRef.current || previewAudioRef.current.src !== audioUrl) {
+      previewAudioRef.current = new Audio(audioUrl);
+      previewAudioRef.current.onended = () => setIsPlayingPreview(false);
+      previewAudioRef.current.onerror = () => setIsPlayingPreview(false);
+    }
+
+    if (isPlayingPreview) {
+      previewAudioRef.current.pause();
+      setIsPlayingPreview(false);
+    } else {
+      previewAudioRef.current.play().then(() => {
+        setIsPlayingPreview(true);
+      }).catch((e) => {
+        console.warn('Preview error:', e);
+        setIsPlayingPreview(false);
+      });
+    }
+  };
+
+  const handleRemoveAudio = () => {
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      previewAudioRef.current = null;
+    }
+    setAudioUrl(null);
+    setAudioFileName(null);
+    setIsPlayingPreview(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,10 +163,14 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({ isOpen, onClose, onW
         exampleSentenceNative: exampleSentenceNative.trim(),
         exampleSentenceFr: exampleSentenceFr.trim(),
         speakerName: speakerName.trim() || undefined,
+        audioUrl: audioUrl || undefined,
       });
 
       playSuccessChime();
-      onWordAdded(newWord);
+      onWordAdded({
+        ...newWord,
+        audioUrl: audioUrl || newWord.audioUrl || undefined,
+      });
       onClose();
     } catch (err: any) {
       setError(err.message || 'Erreur lors de l\'enregistrement du mot.');
@@ -82,7 +199,7 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({ isOpen, onClose, onW
             Enrichir le Dictionnaire Lari
           </h2>
           <p className="text-xs text-savanna-800 font-medium">
-            Ajoutez un nouveau mot au corpus linguistique officiel (synchronisé avec SQLite)
+            Ajoutez un nouveau mot au corpus linguistique avec son audio authentique
           </p>
         </div>
 
@@ -150,6 +267,95 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({ isOpen, onClose, onW
                 className="w-full px-3.5 py-2 rounded-xl bg-savanna-50/70 border border-blue-300 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+          </div>
+
+          {/* AUDIO ATTACHMENT SECTION (FILE IMPORT OR MIC RECORDING) */}
+          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-50 via-cyan-50 to-indigo-50 border border-blue-200 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-blue-950 flex items-center gap-1.5">
+                <Volume2 className="w-4 h-4 text-blue-600" />
+                <span>Audio de prononciation (Fichier ou Micro)</span>
+              </span>
+              {isRecording && (
+                <span className="text-xs font-extrabold text-red-600 animate-pulse">
+                  ● En cours ({recordingSeconds}s)
+                </span>
+              )}
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".wav,.mp3,.m4a,.ogg,.webm,audio/*"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+
+            {!audioUrl ? (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="py-2 px-3 rounded-xl bg-white hover:bg-blue-50 border border-blue-300 text-blue-900 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                >
+                  <Upload className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Importer un fichier (.wav/.mp3)</span>
+                </button>
+
+                {!isRecording ? (
+                  <button
+                    type="button"
+                    onClick={startRecording}
+                    className="py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                  >
+                    <Mic className="w-3.5 h-3.5 text-blue-200" />
+                    <span>Enregistrer au micro</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={stopRecording}
+                    className="py-2 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm animate-pulse"
+                  >
+                    <Square className="w-3.5 h-3.5 fill-white" />
+                    <span>Arrêter ({recordingSeconds}s)</span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-blue-200 shadow-sm gap-2">
+                <button
+                  type="button"
+                  onClick={togglePlayAudio}
+                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold flex items-center gap-1.5 transition-all"
+                >
+                  {isPlayingPreview ? (
+                    <>
+                      <Pause className="w-3.5 h-3.5 fill-white" />
+                      <span>Pause</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-3.5 h-3.5 fill-white" />
+                      <span>Écouter l'audio</span>
+                    </>
+                  )}
+                </button>
+
+                <span className="text-[11px] font-bold text-savanna-800 truncate flex-1 px-1">
+                  {audioFileName || 'Audio attaché'}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={handleRemoveAudio}
+                  className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Supprimer l'audio"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -225,7 +431,7 @@ export const AddWordModal: React.FC<AddWordModalProps> = ({ isOpen, onClose, onW
             ) : (
               <>
                 <Plus className="w-4 h-4" />
-                <span>Enregistrer le Mot en Base de Données</span>
+                <span>Enregistrer le Mot dans le Dictionnaire</span>
               </>
             )}
           </button>
