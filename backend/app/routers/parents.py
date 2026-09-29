@@ -123,3 +123,27 @@ def update_child(
     db.commit()
     db.refresh(child)
     return child
+
+@router.delete("/children/{child_id}", status_code=status.HTTP_200_OK)
+def delete_child(
+    child_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    child = db.query(Child).filter(Child.id == child_id).first()
+    if not child:
+        raise HTTPException(status_code=404, detail="Profil enfant introuvable.")
+
+    if current_user.role not in ["ADMIN"] and child.parent_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Action non autorisée : Vous ne pouvez supprimer que les profils de vos propres enfants."
+        )
+
+    # Delete progress records first
+    db.query(ChildProgress).filter(ChildProgress.child_id == child_id).delete()
+    db.delete(child)
+    db.commit()
+
+    return {"status": "SUCCESS", "message": "Profil enfant supprimé avec succès."}
+

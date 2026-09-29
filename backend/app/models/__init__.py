@@ -6,6 +6,7 @@ from .cultural_story import CulturalStory
 from .validation import LinguisticValidation
 from .progress import ChildProgress
 from .subscription import SubscriptionPlan, UserSubscription, PaymentTransaction
+from .refresh_token import RefreshToken
 
 __all__ = [
     "Language",
@@ -19,4 +20,6 @@ __all__ = [
     "SubscriptionPlan",
     "UserSubscription",
     "PaymentTransaction",
+    "RefreshToken",
 ]
+

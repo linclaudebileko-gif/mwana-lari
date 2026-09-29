@@ -53,8 +53,10 @@ class OpenPayClient:
         return f"242{digits}" if not digits.startswith("242") else digits
 
     def resolve_provider(self, method: str, phone: str) -> str:
-        """Détermine le provider OpenPay ('MTN' ou 'AIRTEL')."""
+        """Détermine le provider OpenPay ('MTN', 'AIRTEL' ou 'CARD')."""
         method_upper = (method or "").upper()
+        if "VISA" in method_upper or "CARD" in method_upper or "MASTERCARD" in method_upper:
+            return "CARD"
         if "AIRTEL" in method_upper:
             return "AIRTEL"
         if "MTN" in method_upper or "MOMO" in method_upper:
@@ -75,16 +77,18 @@ class OpenPayClient:
         metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Initie un paiement Mobile Money auprès de l'API OpenPay Congo.
+        Initie un paiement Mobile Money ou Carte Bancaire auprès de l'API OpenPay Congo.
         Endpoint: POST https://api.openpay-cg.com/v1/transaction/payment
         """
-        clean_phone = self.format_phone_number(phone_number)
+        clean_phone = self.format_phone_number(phone_number) if phone_number else ""
         provider_code = self.resolve_provider(provider, clean_phone)
 
         # Fallback simulation si clé non encore configurée
         if not self.is_configured:
             logger.warning("[OpenPay] Clé API non configurée. Bascule en mode simulation contrôlée.")
-            sim_ref = f"SIM-OP-{clean_phone[-4:]}-{amount_fcfa}"
+            sim_ref = f"SIM-OP-{'CARD' if provider_code == 'CARD' else clean_phone[-4:]}-{amount_fcfa}"
+            is_card = provider_code == "CARD"
+            sim_payment_url = f"https://openpay-cg.com/checkout/{sim_ref}" if is_card else None
             return {
                 "success": True,
                 "mode": "SIMULATION",
@@ -92,9 +96,10 @@ class OpenPayClient:
                 "status": "pending",
                 "amount": str(amount_fcfa),
                 "provider": provider_code,
-                "payment_phone_number": clean_phone,
-                "message": "Demande de paiement simulée avec succès.",
-                "ussd_instruction": f"Veuillez valider le débit de {amount_fcfa:,} FCFA sur votre téléphone {clean_phone} ({provider_code})."
+                "payment_url": sim_payment_url,
+                "payment_phone_number": clean_phone or "INTERNATIONAL_CARD",
+                "message": "Session de paiement par carte initialisée avec succès." if is_card else "Demande de paiement simulée avec succès.",
+                "ussd_instruction": "Redirection vers le guichet de paiement par carte sécurisé..." if is_card else f"Veuillez valider le débit de {amount_fcfa:,} FCFA sur votre téléphone {clean_phone} ({provider_code})."
             }
 
         url = f"{self.base_url}/transaction/payment"
@@ -120,10 +125,10 @@ class OpenPayClient:
 
         logger.info(f"[OpenPay] Envoi requête paiement: {url} | Provider: {provider_code} | Tel: {clean_phone} | Montant: {amount_fcfa}")
 
-        async with httpx.AsyncClient(timeout=20.0) as client:
+        async with httpx.AsyncClient(timeout=35.0) as client:
             try:
                 response = await client.post(url, headers=headers, json=payload)
-                data = response.json() if response.text else {}
+                data = response.json() if (response.text and "json" in response.headers.get("content-type", "")) else {}
                 
                 if response.status_code in (200, 201):
                     ref = data.get("reference") or data.get("transaction_id") or data.get("id")
@@ -139,6 +144,7 @@ class OpenPayClient:
                         "status": "FAILED" if is_failed else ("SUCCESS" if status_val in ("success", "successful") else "PENDING"),
                         "amount": data.get("amount", str(amount_fcfa)),
                         "provider": provider_code,
+                        "payment_url": data.get("payment_url") or data.get("checkout_url") or data.get("redirect_url") or data.get("url"),
                         "payment_phone_number": clean_phone,
                         "message": msg,
                         "error": msg if is_failed else None,
@@ -147,6 +153,22 @@ class OpenPayClient:
                             f"Veuillez composer votre code secret {'MTN (*105#)' if provider_code == 'MTN' else 'Airtel (*128#)'} pour confirmer."
                         ) if not is_failed else msg,
                         "raw": data
+                    }
+                elif response.status_code == 504:
+                    gen_ref = f"OP-{clean_phone[-4:]}-{int(amount_fcfa)}"
+                    ussd_msg = f"Demande USSD transmise à l'opérateur. Composez {'*105#' if provider_code == 'MTN' else '*128#'} sur votre téléphone {phone_number} pour valider le débit de {amount_fcfa:,} FCFA."
+                    logger.warning(f"[OpenPay] 504 Gateway Timeout: bascule en attente USSD différée (ref={gen_ref})")
+                    return {
+                        "success": True,
+                        "mode": "LIVE",
+                        "reference": gen_ref,
+                        "status": "PENDING",
+                        "amount": str(amount_fcfa),
+                        "provider": provider_code,
+                        "payment_phone_number": clean_phone,
+                        "message": ussd_msg,
+                        "ussd_instruction": ussd_msg,
+                        "raw": {"timeout_deferred": True}
                     }
                 else:
                     error_msg = data.get("error") or data.get("message") or f"Erreur HTTP {response.status_code}"
@@ -158,12 +180,28 @@ class OpenPayClient:
                         "raw": data
                     }
 
-            except httpx.RequestError as e:
-                logger.error(f"[OpenPay] Erreur réseau lors de l'appel OpenPay: {e}")
+            except (httpx.TimeoutException, httpx.RequestError) as e:
+                err_type = type(e).__name__
+                logger.warning(f"[OpenPay] Exception réseau/timeout ({err_type}) lors de l'initiation: {e}")
+                if isinstance(e, httpx.TimeoutException):
+                    gen_ref = f"OP-{clean_phone[-4:]}-{int(amount_fcfa)}"
+                    ussd_msg = f"Demande envoyée sur votre téléphone {phone_number}. Composez {'*105#' if provider_code == 'MTN' else '*128#'} pour valider le débit de {amount_fcfa:,} FCFA."
+                    return {
+                        "success": True,
+                        "mode": "LIVE",
+                        "reference": gen_ref,
+                        "status": "PENDING",
+                        "amount": str(amount_fcfa),
+                        "provider": provider_code,
+                        "payment_phone_number": clean_phone,
+                        "message": ussd_msg,
+                        "ussd_instruction": ussd_msg,
+                        "raw": {"timeout_push_dispatched": True}
+                    }
                 return {
                     "success": False,
                     "code": 500,
-                    "error": f"Impossible de contacter la passerelle OpenPay: {str(e)}"
+                    "error": f"Impossible de contacter la passerelle OpenPay: {err_type} - {str(e)}"
                 }
 
     async def check_transaction_status(self, reference_id: str) -> Dict[str, Any]:
@@ -206,18 +244,28 @@ class OpenPayClient:
                 if response.status_code == 200:
                     status_val = (data.get("status") or "").lower()
                     is_successful = status_val in ("success", "successful", "paid", "completed")
-                    is_failed = status_val in ("failed", "canceled", "cancelled", "expired")
+                    is_failed = status_val in ("failed", "canceled", "cancelled", "expired", "rejected")
                     
                     return {
                         "success": True,
                         "reference": data.get("reference", reference_id),
-                        "status": status_val,
+                        "status": "SUCCESS" if is_successful else ("FAILED" if is_failed else "PENDING"),
                         "is_successful": is_successful,
                         "is_failed": is_failed,
                         "amount": data.get("amount"),
                         "currency": data.get("currency", "XAF"),
                         "provider": data.get("provider"),
                         "message": data.get("message", ""),
+                        "raw": data
+                    }
+                elif response.status_code == 404:
+                    return {
+                        "success": True,
+                        "reference": reference_id,
+                        "status": "PENDING",
+                        "is_successful": False,
+                        "is_failed": False,
+                        "message": "Transaction en cours ou en attente d'approbation USSD.",
                         "raw": data
                     }
                 else:

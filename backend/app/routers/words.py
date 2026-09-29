@@ -85,3 +85,24 @@ def create_word(
         db.commit()
 
     return word
+
+@router.delete("/{word_id}", status_code=status.HTTP_200_OK)
+def delete_word(
+    word_id: str,
+    current_user: User = Depends(require_roles(["LINGUIST", "ADMIN"])),
+    db: Session = Depends(get_db)
+):
+    word = db.query(Word).filter(Word.id == word_id).first()
+    if not word:
+        raise HTTPException(status_code=404, detail="Mot introuvable dans le dictionnaire.")
+    
+    # Delete related validations
+    db.query(LinguisticValidation).filter(
+        LinguisticValidation.entity_type == "WORD",
+        LinguisticValidation.entity_id == word_id
+    ).delete()
+    db.delete(word)
+    db.commit()
+
+    return {"status": "SUCCESS", "message": "Mot supprimé du dictionnaire."}
+

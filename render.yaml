@@ -17,10 +17,12 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: ALLOWED_ORIGINS
-        value: "*"
+        value: "https://www.cmd.cg,https://cmd.cg,https://mwana-lari.vercel.app,http://localhost:5173,http://localhost:3000"
       - key: OPENPAY_BASE_URL
         value: "https://api.openpay-cg.com/v1"
       - key: OPENPAY_API_KEY
+        sync: false
+      - key: WEBHOOK_SECRET
         sync: false
 
 # 2. Base de Données PostgreSQL Gérée

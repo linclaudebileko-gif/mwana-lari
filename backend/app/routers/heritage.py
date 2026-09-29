@@ -69,3 +69,23 @@ def contribute_story(
         db.commit()
 
     return story
+
+@router.delete("/stories/{story_id}", status_code=status.HTTP_200_OK)
+def delete_story(
+    story_id: str,
+    current_user: User = Depends(require_roles(["LINGUIST", "ADMIN"])),
+    db: Session = Depends(get_db)
+):
+    story = db.query(CulturalStory).filter(CulturalStory.id == story_id).first()
+    if not story:
+        raise HTTPException(status_code=404, detail="Conte ou proverbe introuvable.")
+
+    db.query(LinguisticValidation).filter(
+        LinguisticValidation.entity_type == "STORY",
+        LinguisticValidation.entity_id == story_id
+    ).delete()
+    db.delete(story)
+    db.commit()
+
+    return {"status": "SUCCESS", "message": "Histoire supprimée du patrimoine."}
+

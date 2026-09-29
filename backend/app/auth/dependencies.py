@@ -3,10 +3,39 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.user import User
-from .security import decode_access_token
+from .security import decode_access_token, validate_csrf_token
 from typing import List, Optional
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
+
+def verify_csrf(request: Request):
+    """
+    CSRF Protection Dependency:
+    Enforces CSRF tokens for state-changing HTTP methods (POST, PUT, PATCH, DELETE)
+    when requests rely on browser cookies for authentication.
+    Requests using an explicit Bearer Authorization header are inherently immune to CSRF
+    because browsers never automatically attach custom Authorization headers.
+    """
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        has_auth_cookie = bool(
+            request.cookies.get("mwana_access_token") or 
+            request.cookies.get("access_token") or
+            request.cookies.get("mwana_refresh_token")
+        )
+        has_bearer_header = bool(
+            request.headers.get("Authorization") and 
+            request.headers.get("Authorization").startswith("Bearer ")
+        )
+        
+        # If authenticated via Cookie and without an explicit Bearer header, CSRF is mandatory
+        if has_auth_cookie and not has_bearer_header:
+            header_csrf = request.headers.get("X-CSRF-Token")
+            cookie_csrf = request.cookies.get("mwana_csrf_token")
+            if not validate_csrf_token(header_csrf, cookie_csrf):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Protection CSRF: Jeton CSRF manquant ou invalide. Veuillez recharger la page."
+                )
 
 def get_current_user(
     request: Request,
@@ -17,6 +46,7 @@ def get_current_user(
     Extracts and validates current user from either:
     1. HttpOnly Secure Cookie ('mwana_access_token' or 'access_token')
     2. Authorization Bearer header
+    Validates token expiration, signature, and token_version (session revocation).
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -50,6 +80,15 @@ def get_current_user(
     if user is None:
         raise credentials_exception
     
+    # Check session invalidation (password change or global logout)
+    token_version = payload.get("ver")
+    if token_version is not None and token_version != (user.token_version or 1):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session révoquée (mot de passe modifié ou déconnexion globale).",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     return user
 
 def get_optional_current_user(
@@ -78,7 +117,15 @@ def get_optional_current_user(
     if not user_id:
         return None
     
-    return db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return None
+
+    token_version = payload.get("ver")
+    if token_version is not None and token_version != (user.token_version or 1):
+        return None
+
+    return user
 
 def require_roles(allowed_roles: List[str]):
     def role_checker(current_user: User = Depends(get_current_user)) -> User:
@@ -89,4 +136,5 @@ def require_roles(allowed_roles: List[str]):
             )
         return current_user
     return role_checker
+
 

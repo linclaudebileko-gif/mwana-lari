@@ -17,6 +17,20 @@ class UserLogin(BaseModel):
 class DemoLoginRequest(BaseModel):
     role: str  # 'parent', 'teacher', 'linguist', 'admin'
 
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: Optional[str] = None
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -24,6 +38,7 @@ class Token(BaseModel):
     email: str
     role: str
     full_name: str
+    csrf_token: Optional[str] = None
 
 class UserOut(BaseModel):
     id: str
@@ -36,3 +51,9 @@ class UserOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class SessionStatus(BaseModel):
+    authenticated: bool
+    user: Optional[UserOut] = None
+    csrf_token: Optional[str] = None
+

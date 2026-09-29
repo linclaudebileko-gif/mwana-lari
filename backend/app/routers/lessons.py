@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from ..database import get_db
 from ..models.child import Child
 from ..models.progress import ChildProgress
 from ..models.user import User
 from ..models.subscription import UserSubscription
 from ..schemas.progress import ProgressSubmit, ProgressOut
-from ..auth.dependencies import get_current_user
+from ..auth.dependencies import get_current_user, get_optional_current_user
 import datetime
 
 router = APIRouter(prefix="", tags=["Académie & Progression"])
@@ -108,12 +108,31 @@ LESSON_ROADMAP = [
 
 @router.get("/lessons")
 def get_lessons(
-    child_id: str = Query(None, description="ID de l'enfant pour calculer le déblocage"),
+    child_id: Optional[str] = Query(None, description="ID de l'enfant pour calculer le déblocage"),
     language: str = Query("LAR"),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db)
 ):
     completed_lesson_ids = set()
     if child_id:
+        # Deny by default: 401 if unauthenticated before disclosing resource existence
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentification requise pour consulter la progression personnalisée d'un enfant."
+            )
+
+        child = db.query(Child).filter(Child.id == child_id).first()
+        if not child:
+            raise HTTPException(status_code=404, detail="Profil enfant introuvable.")
+        
+        # Deny by default: 403 if unauthorized
+        if current_user.role not in ["ADMIN", "TEACHER"] and child.parent_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Accès refusé : Vous ne pouvez consulter que la progression de vos propres enfants."
+            )
+
         records = db.query(ChildProgress.lesson_id).filter(ChildProgress.child_id == child_id).all()
         completed_lesson_ids = {r[0] for r in records}
 

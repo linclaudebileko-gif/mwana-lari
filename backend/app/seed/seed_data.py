@@ -10,6 +10,16 @@ from ..auth.security import get_password_hash
 def seed_database():
     # Create all tables
     Base.metadata.create_all(bind=engine)
+    
+    # Ensure token_version column exists on existing SQLite databases
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 1"))
+            conn.commit()
+    except Exception:
+        pass
+
     db: Session = SessionLocal()
 
     try:

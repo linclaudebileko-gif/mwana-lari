@@ -21,10 +21,22 @@ class Settings(BaseSettings):
     # Database: Default to SQLite for local dev, supports PostgreSQL / Supabase / Neon / Railway in production
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./mwana_lari.db")
     
-    # JWT Auth
+    # JWT & Session Auth Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", DEFAULT_DEV_SECRET)
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", str(60 * 24 * 7)))
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
+    REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+    
+    # Password Policy & HIBP k-Anonymity Configuration
+    MIN_PASSWORD_LENGTH: int = int(os.getenv("MIN_PASSWORD_LENGTH", "12"))
+    MAX_PASSWORD_LENGTH: int = int(os.getenv("MAX_PASSWORD_LENGTH", "256"))
+    CHECK_PWNED_PASSWORDS: bool = os.getenv("CHECK_PWNED_PASSWORDS", "true").lower() in ("true", "1")
+    PWNED_PASSWORDS_FAIL_OPEN: bool = os.getenv("PWNED_PASSWORDS_FAIL_OPEN", "true").lower() in ("true", "1")
+    PWNED_PASSWORDS_TIMEOUT: float = float(os.getenv("PWNED_PASSWORDS_TIMEOUT", "5.0"))
+    
+    # Cookie & CSRF Security Flags
+    COOKIE_SECURE: bool = os.getenv("COOKIE_SECURE", "true" if os.getenv("ENVIRONMENT", "production") == "production" else "false").lower() in ("true", "1")
+    COOKIE_SAMESITE: str = os.getenv("COOKIE_SAMESITE", "lax")
     
     # Webhook Secret for Mobile Money callbacks
     WEBHOOK_SECRET: str = os.getenv("WEBHOOK_SECRET", DEFAULT_DEV_WEBHOOK_SECRET)
@@ -40,7 +52,10 @@ class Settings(BaseSettings):
     OPENPAY_BASE_URL: str = os.getenv("OPENPAY_BASE_URL", "https://api.openpay-cg.com/v1")
     
     # CORS Origins (Explicit whitelist)
-    ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS", "https://www.cmd.cg,https://cmd.cg,http://localhost:3000,http://localhost:5173")
+    ALLOWED_ORIGINS: str = os.getenv(
+        "ALLOWED_ORIGINS", 
+        "https://www.cmd.cg,https://cmd.cg,http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
+    )
 
     @property
     def normalized_database_url(self) -> str:

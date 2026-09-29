@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime
+from sqlalchemy import Column, String, DateTime, Integer
 from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime
@@ -14,8 +14,11 @@ class User(Base):
     role = Column(String(50), nullable=False, default="PARENT") # PARENT, TEACHER, LINGUIST, ADMIN
     full_name = Column(String(150), nullable=False)
     country_code = Column(String(5), default="CG")
+    token_version = Column(Integer, default=1, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     children = relationship("Child", back_populates="parent", cascade="all, delete-orphan")
     validations = relationship("LinguisticValidation", back_populates="validator")
+    refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
+
