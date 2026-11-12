@@ -1,5 +1,5 @@
 {
-  "buildCommand": "node scripts/build.cjs",
+  "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
     {

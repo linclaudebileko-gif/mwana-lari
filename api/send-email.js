@@ -106,7 +106,8 @@ export default async function handler(req, res) {
     // 6. Envoi via SMTP avec transport sécurisé
     let nodemailer;
     try {
-      nodemailer = await import('nodemailer');
+      const pkgName = 'nodemailer';
+      nodemailer = await import(pkgName);
     } catch {
       // Si nodemailer n'est pas installé, log côté serveur sans fuiter d'identifiants
       console.warn('[API Send-Email] Package nodemailer non disponible.');

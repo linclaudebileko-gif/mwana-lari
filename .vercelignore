@@ -1,4 +1,5 @@
 backend/
 serve.js
 docs/
-data/
+backup_master_audio_inventory/
+audio/

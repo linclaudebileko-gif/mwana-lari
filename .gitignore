@@ -11,6 +11,9 @@ build/
 assets/
 public/assets/
 public/audio/words/
+public/audio/*.wav
+public/audio/*.xlsx
+audio/words/
 mwana-lari-wp/
 mwana-lari-wp.zip
 .next/
