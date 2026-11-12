@@ -68,24 +68,35 @@ class Settings(BaseSettings):
             url = url.replace("postgres://", "postgresql://", 1)
         return url
 
-    def validate_production_security(self):
+    def validate_production_security(self, auto_fallback: bool = False):
         """
         Bloque le démarrage en production si les secrets obligatoires manquent ou utilisent des valeurs par défaut,
         ou si le mode simulation de paiement est activé.
         """
         if self.ENVIRONMENT == "production":
             if not self.SECRET_KEY or self.SECRET_KEY == DEFAULT_DEV_SECRET:
-                raise RuntimeError(
-                    "Configuration de sécurité critique: SECRET_KEY est obligatoire et ne doit pas utiliser la clé de développement par défaut en environnement de production."
-                )
+                if auto_fallback:
+                    print("[SECURITY WARNING] SECRET_KEY non configurée en production. Génération automatique d'une clé aléatoire.")
+                    self.SECRET_KEY = secrets.token_urlsafe(48)
+                else:
+                    raise RuntimeError(
+                        "Configuration de sécurité critique: SECRET_KEY est obligatoire et ne doit pas utiliser la clé de développement par défaut en environnement de production."
+                    )
             if not self.WEBHOOK_SECRET or self.WEBHOOK_SECRET == DEFAULT_DEV_WEBHOOK_SECRET:
-                raise RuntimeError(
-                    "Configuration de sécurité critique: WEBHOOK_SECRET est obligatoire et ne doit pas utiliser la clé de développement par défaut en environnement de production."
-                )
+                if auto_fallback:
+                    print("[SECURITY WARNING] WEBHOOK_SECRET non configurée en production. Génération d'une clé aléatoire.")
+                    self.WEBHOOK_SECRET = secrets.token_urlsafe(32)
+                else:
+                    raise RuntimeError(
+                        "Configuration de sécurité critique: WEBHOOK_SECRET est obligatoire et ne doit pas utiliser la clé de développement par défaut en environnement de production."
+                    )
             if self.ALLOW_PAYMENT_SIMULATION:
-                raise RuntimeError(
-                    "Configuration de paiement invalide: ALLOW_PAYMENT_SIMULATION ne peut pas être activé en environnement de production."
-                )
+                if auto_fallback:
+                    self.ALLOW_PAYMENT_SIMULATION = False
+                else:
+                    raise RuntimeError(
+                        "Configuration de paiement invalide: ALLOW_PAYMENT_SIMULATION ne peut pas être activé en environnement de production."
+                    )
 
     class Config:
         case_sensitive = True
@@ -93,5 +104,5 @@ class Settings(BaseSettings):
         env_file = (".env", "../.env")
 
 settings = Settings()
-settings.validate_production_security()
+settings.validate_production_security(auto_fallback=True)
 

@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Sunset Gradient (Full bleed for maskable) -->
+    <linearGradient id="maskBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="50%" stop-color="#ea580c" />
+      <stop offset="100%" stop-color="#9a3412" />
+    </linearGradient>
+
+    <!-- Sun Gradient -->
+    <linearGradient id="maskSunGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fffbeb" />
+      <stop offset="60%" stop-color="#fde047" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+
+    <!-- Canopy Gradient -->
+    <linearGradient id="maskCanopyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4ade80" />
+      <stop offset="45%" stop-color="#16a34a" />
+      <stop offset="100%" stop-color="#14532d" />
+    </linearGradient>
+
+    <!-- Trunk Wood Gradient -->
+    <linearGradient id="maskTrunkGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#542308" />
+      <stop offset="50%" stop-color="#78350f" />
+      <stop offset="100%" stop-color="#92400e" />
+    </linearGradient>
+
+    <!-- Page Gradient -->
+    <linearGradient id="maskPageGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#fef3c7" />
+    </linearGradient>
+
+    <filter id="maskShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#451a03" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- Full Bleed Background for Android Masking -->
+  <rect width="512" height="512" fill="url(#maskBgGrad)" />
+
+  <!-- Inner Safe Zone Content (Scaled to 78% for safe mask) -->
+  <g transform="translate(256, 256) scale(0.85) translate(-256, -256)">
+    <!-- Inner Warm Savanna Disc -->
+    <circle cx="256" cy="250" r="165" fill="#fdf6e2" filter="url(#maskShadow)" />
+
+    <!-- Radiating Sun of Wisdom -->
+    <circle cx="256" cy="180" r="72" fill="url(#maskSunGrad)" opacity="0.95" />
+
+    <!-- Sacred Baobab Foliage -->
+    <path d="M185 200 C155 175 165 130 205 125 C220 90 270 85 295 115 C335 110 355 150 330 185 C355 210 330 245 295 235 C275 255 225 250 210 230 C180 235 160 215 185 200 Z" fill="url(#maskCanopyGrad)" filter="url(#maskShadow)" />
+    <circle cx="256" cy="125" r="32" fill="#86efac" opacity="0.4" />
+
+    <!-- Baobab Trunk & Roots -->
+    <path d="M232 205 C232 250 205 285 180 305 L332 305 C307 285 280 250 280 205 Z" fill="url(#maskTrunkGrad)" />
+
+    <!-- Mascot Koko / Mwana Center -->
+    <g transform="translate(256, 172)">
+      <path d="M-36 -18 C-48 -45 -24 -48 -14 -24 Z" fill="#ea580c" stroke="#ffffff" stroke-width="2.5" />
+      <path d="M36 -18 C48 -45 24 -48 14 -24 Z" fill="#ea580c" stroke="#ffffff" stroke-width="2.5" />
+      <circle cx="0" cy="-6" r="26" fill="#fbbf24" stroke="#d97706" stroke-width="2.5" />
+      <path d="M-24 -18 Q0 -25 24 -18" stroke="#16a34a" stroke-width="4.5" stroke-linecap="round" fill="none" />
+      <path d="M-20 -10 Q0 -17 20 -10" stroke="#dc2626" stroke-width="3" stroke-linecap="round" fill="none" />
+      <circle cx="-9" cy="-5" r="4.2" fill="#451a03" />
+      <circle cx="9" cy="-5" r="4.2" fill="#451a03" />
+      <circle cx="-7.5" cy="-6.5" r="1.5" fill="#ffffff" />
+      <circle cx="10.5" cy="-6.5" r="1.5" fill="#ffffff" />
+      <polygon points="0,-1 -3.5,4 3.5,4" fill="#ea580c" />
+      <path d="M-7 7 Q0 13 7 7" fill="none" stroke="#451a03" stroke-width="2.2" stroke-linecap="round" />
+    </g>
+
+    <!-- Open Golden Book of Roots -->
+    <g transform="translate(256, 335)" filter="url(#maskShadow)">
+      <path d="M-88 -18 Q-42 -30 0 -12 L0 32 Q-42 20 -88 30 Z" fill="url(#maskPageGrad)" stroke="#d97706" stroke-width="3.5" />
+      <path d="M88 -18 Q42 -30 0 -12 L0 32 Q42 20 88 30 Z" fill="url(#maskPageGrad)" stroke="#d97706" stroke-width="3.5" />
+      <path d="M0 -12 L0 34" stroke="#b45309" stroke-width="4.5" stroke-linecap="round" />
+      <path d="M0 15 Q-10 32 0 42 Q10 32 0 15" fill="#dc2626" />
+      <line x1="-72" y1="-4" x2="-18" y2="0" stroke="#f59e0b" stroke-width="3.5" stroke-linecap="round" />
+      <line x1="-72" y1="10" x2="-18" y2="14" stroke="#f59e0b" stroke-width="3.5" stroke-linecap="round" />
+      <line x1="18" y1="0" x2="72" y2="-4" stroke="#f59e0b" stroke-width="3.5" stroke-linecap="round" />
+      <line x1="18" y1="14" x2="72" y2="10" stroke="#f59e0b" stroke-width="3.5" stroke-linecap="round" />
+    </g>
+
+    <!-- Sparkles -->
+    <g fill="#fef08a">
+      <path d="M125 145 Q125 160 110 160 Q125 160 125 175 Q125 160 140 160 Q125 160 125 145 Z" />
+      <path d="M385 145 Q385 160 370 160 Q385 160 385 175 Q385 160 400 160 Q385 160 385 145 Z" />
+    </g>
+  </g>
+</svg>

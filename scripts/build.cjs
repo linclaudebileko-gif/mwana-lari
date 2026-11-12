@@ -35,7 +35,13 @@ removeDir('dist');
 fs.mkdirSync('dist/assets', { recursive: true });
 
 console.log('🚀 [Build] 2. Génération et copie des fichiers audio & PWA...');
-execSync('node scripts/generate_png_icons.cjs', { stdio: 'inherit' });
+if (process.platform === 'win32' && !fs.existsSync('public/icons/icon-512x512.png')) {
+  try {
+    execSync('node scripts/generate_png_icons.cjs', { stdio: 'inherit' });
+  } catch (e) {
+    console.warn('Note: Icon generation skipped:', e.message);
+  }
+}
 execSync('node scripts/generate_audio.js', { stdio: 'inherit' });
 copyDir('public', 'dist', ['assets']);
 

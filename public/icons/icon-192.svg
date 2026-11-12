@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="100%" height="100%">
+  <defs>
+    <!-- Background Sunset Gradient -->
+    <linearGradient id="bgGrad192" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="50%" stop-color="#ea580c" />
+      <stop offset="100%" stop-color="#9a3412" />
+    </linearGradient>
+
+    <!-- Sun Gradient -->
+    <linearGradient id="sunGrad192" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fffbeb" />
+      <stop offset="60%" stop-color="#fde047" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+
+    <!-- Baobab Canopy Gradient -->
+    <linearGradient id="canopyGrad192" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4ade80" />
+      <stop offset="50%" stop-color="#16a34a" />
+      <stop offset="100%" stop-color="#14532d" />
+    </linearGradient>
+
+    <!-- Trunk Gradient -->
+    <linearGradient id="trunkGrad192" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#542308" />
+      <stop offset="50%" stop-color="#78350f" />
+      <stop offset="100%" stop-color="#92400e" />
+    </linearGradient>
+
+    <!-- Golden Page Gradient -->
+    <linearGradient id="pageGrad192" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#fef3c7" />
+    </linearGradient>
+
+    <!-- Filter for Shadow -->
+    <filter id="shadow192" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#451a03" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- Squircle Canvas -->
+  <rect width="192" height="192" rx="42" fill="url(#bgGrad192)" />
+
+  <!-- Outer Ambient Ring -->
+  <circle cx="96" cy="96" r="82" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-opacity="0.2" />
+
+  <!-- Inner Savanna Disc -->
+  <circle cx="96" cy="94" r="62" fill="#fdf6e2" filter="url(#shadow192)" />
+
+  <!-- Sun Disc -->
+  <circle cx="96" cy="68" r="28" fill="url(#sunGrad192)" opacity="0.95" />
+
+  <!-- Baobab Foliage Canopy -->
+  <g filter="url(#shadow192)">
+    <path d="M70 76 C58 66 62 50 78 48 C84 34 102 32 112 44 C126 42 134 58 124 71 C134 81 124 94 112 90 C104 98 86 96 80 88 C68 90 60 82 70 76 Z" fill="url(#canopyGrad192)" />
+    <!-- Leaf Highlights -->
+    <circle cx="82" cy="58" r="10" fill="#86efac" opacity="0.4" />
+    <circle cx="110" cy="56" r="11" fill="#86efac" opacity="0.4" />
+    <circle cx="96" cy="46" r="12" fill="#bbf7d0" opacity="0.45" />
+  </g>
+
+  <!-- Trunk & Roots -->
+  <path d="M87 78 C87 95 77 108 68 115 L124 115 C115 108 105 95 105 78 Z" fill="url(#trunkGrad192)" />
+
+  <!-- Mascot Koko / Mwana Emblem Smiling Face -->
+  <g transform="translate(96, 65)">
+    <!-- Ears -->
+    <path d="M-14 -7 C-19 -18 -9 -19 -5 -9 Z" fill="#ea580c" stroke="#ffffff" stroke-width="1" />
+    <path d="M14 -7 C19 -18 9 -19 5 -9 Z" fill="#ea580c" stroke="#ffffff" stroke-width="1" />
+    <!-- Head Base -->
+    <circle cx="0" cy="-2" r="10" fill="#fbbf24" stroke="#d97706" stroke-width="1" />
+    <!-- Kongo Headband -->
+    <path d="M-9 -6 Q0 -9 9 -6" stroke="#16a34a" stroke-width="1.8" stroke-linecap="round" fill="none" />
+    <path d="M-8 -4 Q0 -7 8 -4" stroke="#dc2626" stroke-width="1.2" stroke-linecap="round" fill="none" />
+    <!-- Eyes -->
+    <circle cx="-3.5" cy="-2" r="1.6" fill="#451a03" />
+    <circle cx="3.5" cy="-2" r="1.6" fill="#451a03" />
+    <circle cx="-3" cy="-2.5" r="0.6" fill="#ffffff" />
+    <circle cx="4" cy="-2.5" r="0.6" fill="#ffffff" />
+    <!-- Smile -->
+    <path d="M-2.5 2 Q0 4.5 2.5 2" fill="none" stroke="#451a03" stroke-width="1" stroke-linecap="round" />
+  </g>
+
+  <!-- Open Golden Book of Roots at the Base -->
+  <g transform="translate(96, 126)" filter="url(#shadow192)">
+    <path d="M-34 -7 Q-16 -12 0 -5 L0 12 Q-16 7 -34 11 Z" fill="url(#pageGrad192)" stroke="#d97706" stroke-width="1.4" />
+    <path d="M34 -7 Q16 -12 0 -5 L0 12 Q16 7 34 11 Z" fill="url(#pageGrad192)" stroke="#d97706" stroke-width="1.4" />
+    <path d="M0 -5 L0 13" stroke="#b45309" stroke-width="1.8" stroke-linecap="round" />
+    <path d="M0 6 Q-4 13 0 17 Q4 13 0 6" fill="#dc2626" />
+    <!-- Text Lines -->
+    <line x1="-28" y1="-1" x2="-7" y2="1" stroke="#f59e0b" stroke-width="1.2" stroke-linecap="round" />
+    <line x1="-28" y1="5" x2="-7" y2="7" stroke="#f59e0b" stroke-width="1.2" stroke-linecap="round" />
+    <line x1="7" y1="1" x2="28" y2="-1" stroke="#f59e0b" stroke-width="1.2" stroke-linecap="round" />
+    <line x1="7" y1="7" x2="28" y2="5" stroke="#f59e0b" stroke-width="1.2" stroke-linecap="round" />
+  </g>
+
+  <!-- Golden Sparkles -->
+  <g fill="#fef08a">
+    <path d="M48 54 Q48 60 42 60 Q48 60 48 66 Q48 60 54 60 Q48 60 48 54 Z" />
+    <path d="M144 54 Q144 60 138 60 Q144 60 144 66 Q144 60 150 60 Q144 60 144 54 Z" />
+  </g>
+</svg>

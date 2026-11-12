@@ -36,8 +36,8 @@ def _ensure_schema(eng):
         pass
 
     for col, col_type in [
-        ("applied_at", "DATETIME"),
-        ("is_applied", "BOOLEAN DEFAULT 0"),
+        ("applied_at", "TIMESTAMP"),
+        ("is_applied", "BOOLEAN DEFAULT FALSE"),
         ("consultation_token", "VARCHAR(64)")
     ]:
         try:
@@ -55,7 +55,7 @@ def _ensure_schema(eng):
                     user_id VARCHAR(36) NOT NULL,
                     subscription_id VARCHAR(36) NOT NULL,
                     amount FLOAT NOT NULL,
-                    applied_at DATETIME NOT NULL
+                    applied_at TIMESTAMP NOT NULL
                 )
             """))
             conn.commit()
