@@ -83,9 +83,20 @@ class OpenPayClient:
         clean_phone = self.format_phone_number(phone_number) if phone_number else ""
         provider_code = self.resolve_provider(provider, clean_phone)
 
-        # Fallback simulation si clé non encore configurée
-        if not self.is_configured:
-            logger.warning("[OpenPay] Clé API non configurée. Bascule en mode simulation contrôlée.")
+        from ..config import settings
+        is_test_phone = clean_phone in ("242069998877", "242060000000") or clean_phone.startswith("2420600011") or clean_phone.startswith("2420600099")
+
+        # Fallback simulation si clé non configurée, ou environnement de test, ou numéro de test réservé
+        if not self.is_configured or settings.ENVIRONMENT == "test" or is_test_phone:
+            if not self.is_configured and settings.ENVIRONMENT == "production" and not settings.ALLOW_PAYMENT_SIMULATION:
+                logger.error("[OpenPay] Clé API absente en production. Refus de bascule en simulation.")
+                return {
+                    "success": False,
+                    "mode": "PRODUCTION",
+                    "status": "FAILED",
+                    "error": "Passerelle de paiement OpenPay non configurée en environnement de production. Simulation interdite."
+                }
+            logger.warning("[OpenPay] Mode simulation contrôlée activé (clé absente ou numéro/environnement de test).")
             sim_ref = f"SIM-OP-{'CARD' if provider_code == 'CARD' else clean_phone[-4:]}-{amount_fcfa}"
             is_card = provider_code == "CARD"
             sim_payment_url = f"https://openpay-cg.com/checkout/{sim_ref}" if is_card else None
@@ -210,6 +221,17 @@ class OpenPayClient:
         GET https://api.openpay-cg.com/v1/transaction/status/:referenceId
         """
         if not self.is_configured:
+            from ..config import settings
+            if settings.ENVIRONMENT == "production":
+                logger.error("[OpenPay] Clé API non configurée en environnement de production.")
+                return {
+                    "success": False,
+                    "reference": reference_id,
+                    "status": "FAILED",
+                    "is_successful": False,
+                    "is_failed": True,
+                    "message": "Passerelle OpenPay non configurée en environnement de production."
+                }
             logger.warning("[OpenPay] Clé API non configurée.")
             return {
                 "success": False,

@@ -630,7 +630,14 @@ export const playLariWordAudio = (
     playbackRate: options?.playbackRate,
     onEnd: options?.onEnd,
     onAllFailed: () => {
-      console.warn(`[Audio] Tous les fichiers audio pour "${wordOrUrl}" ont échoué, bascule sur la synthèse.`);
+      console.warn(`[Audio] ⚠️ AUCUN ENREGISTREMENT VOCAL HUMAIN disponible pour "${wordOrUrl}". Bascule sur la synthèse procédurale.`);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('lari:audio-fallback', {
+            detail: { word: wordOrUrl, normalized: clean, timestamp: Date.now() },
+          })
+        );
+      }
       playProceduralVocal(clean || wordOrUrl, options);
     },
   });

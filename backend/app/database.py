@@ -26,6 +26,44 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
+def _ensure_schema(eng):
+    from sqlalchemy import text
+    try:
+        with eng.connect() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 1"))
+            conn.commit()
+    except Exception:
+        pass
+
+    for col, col_type in [
+        ("applied_at", "DATETIME"),
+        ("is_applied", "BOOLEAN DEFAULT 0"),
+        ("consultation_token", "VARCHAR(64)")
+    ]:
+        try:
+            with eng.connect() as conn:
+                conn.execute(text(f"ALTER TABLE payment_transactions ADD COLUMN {col} {col_type}"))
+                conn.commit()
+        except Exception:
+            pass
+
+    try:
+        with eng.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS applied_payments (
+                    transaction_ref VARCHAR(100) PRIMARY KEY,
+                    user_id VARCHAR(36) NOT NULL,
+                    subscription_id VARCHAR(36) NOT NULL,
+                    amount FLOAT NOT NULL,
+                    applied_at DATETIME NOT NULL
+                )
+            """))
+            conn.commit()
+    except Exception:
+        pass
+
+_ensure_schema(engine)
+
 def get_db():
     db = SessionLocal()
     try:

@@ -57,6 +57,9 @@ class Settings(BaseSettings):
         "https://www.cmd.cg,https://cmd.cg,http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
     )
 
+    # Flag pour autoriser explicitement la simulation de paiement (réservé au développement / tests)
+    ALLOW_PAYMENT_SIMULATION: bool = os.getenv("ALLOW_PAYMENT_SIMULATION", "false" if os.getenv("ENVIRONMENT", "production") == "production" else "true").lower() in ("true", "1")
+
     @property
     def normalized_database_url(self) -> str:
         url = self.DATABASE_URL
@@ -67,16 +70,22 @@ class Settings(BaseSettings):
 
     def validate_production_security(self):
         """
-        Ensures production deployments do not run with default placeholder secrets.
+        Bloque le démarrage en production si les secrets obligatoires manquent ou utilisent des valeurs par défaut,
+        ou si le mode simulation de paiement est activé.
         """
         if self.ENVIRONMENT == "production":
             if not self.SECRET_KEY or self.SECRET_KEY == DEFAULT_DEV_SECRET:
-                # Generate an ephemeral strong key to prevent static dictionary attacks if not set
-                print("[SECURITY WARNING] SECRET_KEY non configurée en production. Génération automatique d'une clé aléatoire.")
-                self.SECRET_KEY = secrets.token_urlsafe(48)
+                raise RuntimeError(
+                    "Configuration de sécurité critique: SECRET_KEY est obligatoire et ne doit pas utiliser la clé de développement par défaut en environnement de production."
+                )
             if not self.WEBHOOK_SECRET or self.WEBHOOK_SECRET == DEFAULT_DEV_WEBHOOK_SECRET:
-                print("[SECURITY WARNING] WEBHOOK_SECRET non configurée en production. Génération d'une clé aléatoire.")
-                self.WEBHOOK_SECRET = secrets.token_urlsafe(32)
+                raise RuntimeError(
+                    "Configuration de sécurité critique: WEBHOOK_SECRET est obligatoire et ne doit pas utiliser la clé de développement par défaut en environnement de production."
+                )
+            if self.ALLOW_PAYMENT_SIMULATION:
+                raise RuntimeError(
+                    "Configuration de paiement invalide: ALLOW_PAYMENT_SIMULATION ne peut pas être activé en environnement de production."
+                )
 
     class Config:
         case_sensitive = True

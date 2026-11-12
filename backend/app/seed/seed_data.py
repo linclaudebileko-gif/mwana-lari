@@ -5,13 +5,14 @@ from ..models.user import User
 from ..models.child import Child
 from ..models.word import Word, Pronunciation
 from ..models.cultural_story import CulturalStory
+from ..models.validation import LinguisticValidation
 from ..auth.security import get_password_hash
 
 def seed_database():
     # Create all tables
     Base.metadata.create_all(bind=engine)
     
-    # Ensure token_version column exists on existing SQLite databases
+    # Ensure schema migrations for existing databases
     try:
         from sqlalchemy import text
         with engine.connect() as conn:
@@ -19,6 +20,19 @@ def seed_database():
             conn.commit()
     except Exception:
         pass
+
+    for col, col_type in [
+        ("applied_at", "DATETIME"),
+        ("is_applied", "BOOLEAN DEFAULT 0"),
+        ("consultation_token", "VARCHAR(64)")
+    ]:
+        try:
+            from sqlalchemy import text
+            with engine.connect() as conn:
+                conn.execute(text(f"ALTER TABLE payment_transactions ADD COLUMN {col} {col_type}"))
+                conn.commit()
+        except Exception:
+            pass
 
     db: Session = SessionLocal()
 
@@ -91,59 +105,103 @@ def seed_database():
             db.commit()
             print("[SEED] OK - Profil enfant 'Kamba' cree pour le parent demo.")
 
-        # 4. Seed Lari Vocabulary Words
-        if db.query(Word).count() == 0:
-            import json
-            import os
-            
-            json_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "lexicon", "dictionnaire_lari_francais.json"))
-            words_data = []
-            
-            if os.path.exists(json_path):
-                with open(json_path, "r", encoding="utf-8") as f:
-                    raw_words = json.load(f)
-                    for item in raw_words:
-                        audio_filename = item["wordNative"].lower().replace("'", "").replace("ù", "u").replace("á", "a").replace("-", "") + ".wav"
-                        words_data.append({
-                            "word_native": item.get("wordNative"),
-                            "phonetic": item.get("phonetic"),
-                            "translation_fr": item.get("translationFr"),
-                            "translation_en": item.get("translationEn", ""),
-                            "category": item.get("category", "Général"),
-                            "difficulty_level": item.get("difficultyLevel", 1),
-                            "cultural_note": item.get("culturalNote", ""),
-                            "example_sentence_native": item.get("exampleSentenceNative", ""),
-                            "example_sentence_fr": item.get("exampleSentenceFr", ""),
-                            "audio_url": f"/audio/words/{audio_filename}",
-                            "speaker_name": "Mamma Pauline (Brazzaville)"
-                        })
-            
-            if not words_data:
-                words_data = [
-                    {
-                        "word_native": "Mbote",
-                        "phonetic": "[m̀-bó-tè]",
-                        "translation_fr": "Bonjour / Salut / Paix",
-                        "translation_en": "Hello / Peace",
-                        "category": "Salutations",
-                        "difficulty_level": 1,
-                        "cultural_note": "Formule de politesse fondamentale prononcée en inclinant légèrement la tête.",
-                        "example_sentence_native": "Mbote na beno babonso !",
-                        "example_sentence_fr": "Bonjour à vous tous !",
-                        "audio_url": "/audio/words/mbote.wav",
-                        "speaker_name": "Mamma Pauline (Brazzaville)",
-                    }
-                ]
-            
-            for w in words_data:
-                word_obj = Word(
-                    language_id="LAR",
-                    is_validated=True,
-                    **w
-                )
-                db.add(word_obj)
-            db.commit()
-            print(f"[SEED] OK - {len(words_data)} mots Lari inseres avec succes depuis la base lexicale.")
+        # 4. Seed Lari Vocabulary Words, Pronunciations & Linguistic Validations
+        import json
+        import os
+
+        manifest_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "lexicon", "audio_manifest.json"))
+        lex_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "lexicon", "dictionnaire_lari_francais.json"))
+
+        manifest_data = []
+        if os.path.exists(manifest_path):
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                manifest_data = json.load(f)
+        elif os.path.exists(lex_path):
+            with open(lex_path, "r", encoding="utf-8") as f:
+                manifest_data = json.load(f)
+
+        if manifest_data:
+            validator_user = db.query(User).filter(User.role == "LINGUIST").first() or admin_user
+            current_word_count = db.query(Word).count()
+
+            if current_word_count < len(manifest_data):
+                print(f"[SEED] Synchronisation de l'integralite du corpus ({len(manifest_data)} mots)...")
+                existing_words_map = {(w.word_native.strip().lower(), w.translation_fr.strip().lower()): w for w in db.query(Word).all()}
+
+                words_to_add = []
+                pronunciations_to_add = []
+                validations_to_add = []
+
+                for item in manifest_data:
+                    native = item.get("word_native") or item.get("wordNative")
+                    trans_fr = item.get("translation_fr") or item.get("translationFr")
+                    if not native or not trans_fr:
+                        continue
+
+                    key = (native.strip().lower(), trans_fr.strip().lower())
+                    audio_url = item.get("audio_url") or item.get("audioUrl")
+                    is_val = bool(item.get("is_validated", True) if audio_url else False)
+
+                    word_obj = existing_words_map.get(key)
+                    if not word_obj:
+                        word_obj = Word(
+                            language_id="LAR",
+                            word_native=native,
+                            phonetic=item.get("phonetic"),
+                            translation_fr=trans_fr,
+                            translation_en=item.get("translation_en") or item.get("translationEn", ""),
+                            category=item.get("category", "Vocabulaire Général"),
+                            difficulty_level=item.get("difficulty_level") or item.get("difficultyLevel", 1),
+                            cultural_note=item.get("cultural_note") or item.get("culturalNote", ""),
+                            audio_url=audio_url,
+                            speaker_name=item.get("speaker_name") or item.get("speakerName") or "Comité des Sages & Linguistes Lari (Pool / Brazzaville)",
+                            is_validated=is_val
+                        )
+                        db.add(word_obj)
+                        db.flush()
+                        existing_words_map[key] = word_obj
+                    else:
+                        # Update audio_url and validation status if missing or outdated
+                        if audio_url and word_obj.audio_url != audio_url:
+                            word_obj.audio_url = audio_url
+                            word_obj.is_validated = is_val
+
+                    # Ensure Pronunciation record exists
+                    if audio_url:
+                        existing_pron = db.query(Pronunciation).filter(Pronunciation.word_id == word_obj.id).first()
+                        if not existing_pron:
+                            pron = Pronunciation(
+                                word_id=word_obj.id,
+                                audio_url=audio_url,
+                                speaker_name=word_obj.speaker_name,
+                                speaker_type="NATIVE_ELDER",
+                                is_primary=True
+                            )
+                            pronunciations_to_add.append(pron)
+
+                    # Ensure LinguisticValidation record exists
+                    if is_val and validator_user:
+                        existing_val = db.query(LinguisticValidation).filter(
+                            LinguisticValidation.entity_type == "WORD",
+                            LinguisticValidation.entity_id == word_obj.id
+                        ).first()
+                        if not existing_val:
+                            val = LinguisticValidation(
+                                entity_type="WORD",
+                                entity_id=word_obj.id,
+                                validator_id=validator_user.id,
+                                status="APPROVED",
+                                comments="Prononciation authentique et conformité lexicale MBUTA validées."
+                            )
+                            validations_to_add.append(val)
+
+                if pronunciations_to_add:
+                    db.add_all(pronunciations_to_add)
+                if validations_to_add:
+                    db.add_all(validations_to_add)
+
+                db.commit()
+                print(f"[SEED] OK - {db.query(Word).count()} mots Lari, {db.query(Pronunciation).count()} prononciations et {db.query(LinguisticValidation).count()} validations enregistrees.")
 
         # 5. Seed Cultural Stories (Nzolo ya Bakulu)
         if db.query(CulturalStory).count() == 0:

@@ -7,7 +7,9 @@
     "dev": "node serve.js",
     "build": "node scripts/build.cjs",
     "preview": "node serve.js",
-    "generate:audio": "node scripts/generate_audio.js"
+    "generate:audio": "node scripts/generate_audio.js",
+    "manifest:generate": "node scripts/generate_audio_manifest.cjs",
+    "check:audio": "node scripts/check_audio_integrity.cjs"
   },
   "dependencies": {
     "@types/node": "^22.10.2",

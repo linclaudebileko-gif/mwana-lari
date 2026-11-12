@@ -5,7 +5,7 @@ from .word import Word, Pronunciation
 from .cultural_story import CulturalStory
 from .validation import LinguisticValidation
 from .progress import ChildProgress
-from .subscription import SubscriptionPlan, UserSubscription, PaymentTransaction
+from .subscription import SubscriptionPlan, UserSubscription, PaymentTransaction, AppliedPayment
 from .refresh_token import RefreshToken
 
 __all__ = [
@@ -20,6 +20,7 @@ __all__ = [
     "SubscriptionPlan",
     "UserSubscription",
     "PaymentTransaction",
+    "AppliedPayment",
     "RefreshToken",
 ]
 

@@ -50,4 +50,22 @@ class PaymentTransaction(Base):
     transaction_ref = Column(String(100), unique=True, nullable=False)
     provider_transaction_id = Column(String(100), nullable=True)
     metadata_json = Column(Text, nullable=True)
+    consultation_token = Column(String(64), nullable=True) # Jeton de consultation pour accès sécurisé non authentifié
+    applied_at = Column(DateTime, nullable=True)
+    is_applied = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class AppliedPayment(Base):
+    """
+    Table d'immutabilité pour la protection absolue contre le rejeu de paiements.
+    Contrainte d'unicité / Clé primaire sur transaction_ref garantissant qu'une transaction
+    ne peut être appliquée qu'une seule fois, de façon atomique.
+    """
+    __tablename__ = "applied_payments"
+
+    transaction_ref = Column(String(100), primary_key=True)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    subscription_id = Column(String(36), ForeignKey("user_subscriptions.id", ondelete="CASCADE"), nullable=False)
+    amount = Column(Float, nullable=False)
+    applied_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+

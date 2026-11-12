@@ -40,6 +40,20 @@ def test_auth_login():
     print("PASS: Parent demo login")
     return admin_data["access_token"], parent_data["access_token"]
 
+import pytest
+
+@pytest.fixture
+def auth_tokens():
+    return test_auth_login()
+
+@pytest.fixture
+def parent_token(auth_tokens):
+    return auth_tokens[1]
+
+@pytest.fixture
+def admin_token(auth_tokens):
+    return auth_tokens[0]
+
 def test_children_and_progress(parent_token):
     headers = {"Authorization": f"Bearer {parent_token}"}
     

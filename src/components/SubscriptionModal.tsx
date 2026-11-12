@@ -59,6 +59,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   const [step, setStep] = useState<'SELECTION' | 'PROCESSING' | 'SUCCESS'>('SELECTION');
   const [countdown, setCountdown] = useState<number>(6);
   const [transactionRef, setTransactionRef] = useState<string>('');
+  const [consultationToken, setConsultationToken] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   useEffect(() => {
@@ -78,6 +79,47 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       }
     }
   }, [isOpen, initialPlanTier]);
+
+  // Polling automatique du statut OpenPay toutes les 5s pendant l'étape PROCESSING
+  // (évite l'expiration du délai de 5 minutes d'OpenPay et active l'abonnement dès la saisie du PIN)
+  useEffect(() => {
+    if (!isOpen || step !== 'PROCESSING') return;
+    const checkTarget = transactionRef || currentTxId;
+    if (!checkTarget) return;
+
+    let cancelled = false;
+    const pollInterval = setInterval(async () => {
+      if (cancelled || isVerifying) return;
+      try {
+        const res = await paymentsAPI.checkOpenPayStatus(checkTarget, consultationToken);
+        if (cancelled || !res) return;
+
+        if (res.status === 'SUCCESS' || res.is_successful === true) {
+          clearInterval(pollInterval);
+          await upgradeSubscription(selectedTier, {
+            planName: selectedPlan.name,
+            billingCycle,
+            paymentMethod,
+            phoneNumber: paymentMethod === 'VISA_MASTERCARD' ? (cardPhoneContact || 'Carte Bancaire') : `${countryPrefix} ${phoneNumber}`,
+          });
+          playSuccessChime();
+          setStep('SUCCESS');
+        } else if (res.status === 'FAILED' || res.is_failed === true || res.status === 'CANCELLED') {
+          clearInterval(pollInterval);
+          setVerifyStatusMessage(
+            res.message || "Le paiement a été refusé ou a expiré. Veuillez vérifier votre solde ou plafond et recommencer."
+          );
+        }
+      } catch {
+        // Silencieux pendant le polling automatique
+      }
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(pollInterval);
+    };
+  }, [isOpen, step, transactionRef, currentTxId, consultationToken]);
 
   // Auto-detect operator based on phone prefix in Congo (+242)
   const handlePhoneChange = (val: string) => {
@@ -162,8 +204,12 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 
       const txId = (resp as any)?.transaction_id || `tx_op_${Date.now()}`;
       const refCode = (resp as any)?.reference_code || (resp as any)?.reference || `OP-${Date.now().toString().slice(-6)}`;
+      const token = (resp as any)?.consultation_token || '';
       setCurrentTxId(txId);
       setTransactionRef(refCode);
+      if (token) {
+        setConsultationToken(token);
+      }
 
       const returnedUrl = (resp as any)?.payment_url || (resp as any)?.checkout_url || (resp as any)?.url;
       if (returnedUrl) {
@@ -205,8 +251,8 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
     setVerifyStatusMessage('');
 
     try {
-      // 1. Vérification réelle auprès de l'API OpenPay Congo / MoMo
-      const res = await paymentsAPI.checkOpenPayStatus(checkTarget);
+      // 1. Vérification réelle auprès de l'API OpenPay Congo / MoMo avec jeton de consultation
+      const res = await paymentsAPI.checkOpenPayStatus(checkTarget, consultationToken);
       
       if (res && (res.status === 'SUCCESS' || res.is_successful === true)) {
         // Sauvegarde de la transaction confirmée dans le cache local admin
@@ -242,7 +288,9 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 
       if (res && (res.status === 'FAILED' || res.is_failed === true || res.status === 'CANCELLED')) {
         setIsVerifying(false);
-        setVerifyStatusMessage("Le paiement a été refusé ou a expiré. Veuillez vérifier votre solde ou plafond et recommencer.");
+        setVerifyStatusMessage(
+          res.message || "Le paiement a été refusé ou a expiré. Veuillez vérifier votre solde ou plafond et recommencer."
+        );
         return;
       }
 

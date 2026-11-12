@@ -719,9 +719,10 @@ export const paymentsAPI = {
     }
   },
 
-  verifyPayment: async (transactionId: string) => {
+  verifyPayment: async (transactionId: string, token?: string) => {
     try {
-      const res = await apiRequest<{ status: string; is_successful?: boolean }>(`/payments/verify/${transactionId}`);
+      const qs = token ? `?token=${encodeURIComponent(token)}` : '';
+      const res = await apiRequest<{ status: string; is_successful?: boolean }>(`/payments/verify/${transactionId}${qs}`);
       return res;
     } catch (err) {
       return {
@@ -811,15 +812,16 @@ export const paymentsAPI = {
     }
   },
 
-  checkOpenPayStatus: async (referenceId: string) => {
+  checkOpenPayStatus: async (referenceId: string, token?: string) => {
+    const qs = token ? `?token=${encodeURIComponent(token)}` : '';
     try {
       // Vérification auprès du endpoint OpenPay
-      const res = await apiRequest<any>(`/payments/openpay/check/${referenceId}`);
+      const res = await apiRequest<any>(`/payments/openpay/check/${referenceId}${qs}`);
       return res;
     } catch {
       // Si la route openpay/check n'est pas disponible, interroge le statut général
       try {
-        const verifyRes = await apiRequest<any>(`/payments/verify/${referenceId}`);
+        const verifyRes = await apiRequest<any>(`/payments/verify/${referenceId}${qs}`);
         return verifyRes;
       } catch {
         return {

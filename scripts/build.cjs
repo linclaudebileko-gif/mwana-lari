@@ -70,7 +70,7 @@ try {
   if (fs.existsSync('mwana-lari-v3.zip')) {
     try { fs.unlinkSync('mwana-lari-v3.zip'); } catch {}
   }
-  execSync('powershell -Command "Compress-Archive -Path \'dist\\*\' -DestinationPath \'mwana-lari-v3.zip\' -Force"', { stdio: 'ignore' });
+  execSync('powershell -Command "Compress-Archive -Path \'dist\' -DestinationPath \'mwana-lari-v3.zip\' -Force"', { timeout: 30000, stdio: 'ignore' });
   console.log('✅ [Build] mwana-lari-v3.zip généré avec succès !');
 } catch (e) {
   console.warn('Note: ZIP generation skipped or handled externally');

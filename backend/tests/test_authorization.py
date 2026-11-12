@@ -324,16 +324,27 @@ def test_direct_api_calls_without_browser_interface():
     # la session de ce parent sans authentification.
     parent_c, victim_id, _ = create_fresh_parent(f"victim_{uuid.uuid4().hex[:6]}@mwanalari.cg", "Victim Parent")
 
-    # Requête directe non authentifiée essayant d'usurper victim_id
-    res_direct_momo = direct_client.post("/api/v1/payments/momo/initiate", json={
-        "plan_id": "plan_family",
-        "tier": "FAMILY",
-        "billing_cycle": "monthly",
-        "method": "MTN_MOMO",
-        "phone_number": "+242069998877",
-        "amount_fcfa": 1500,
-        "user_id": victim_id # tentative d'usurpation de compte
-    })
+    # Requête directe non authentifiée essayant d'usurper victim_id (avec mock OpenPay pour éviter tout appel réseau réel)
+    from unittest.mock import patch
+    with patch("app.routers.payments.openpay_client.initiate_payment") as mock_init:
+        mock_init.return_value = {
+            "success": True,
+            "mode": "SIMULATION",
+            "reference": f"SIM-TEST-{uuid.uuid4().hex[:8].upper()}",
+            "status": "PENDING",
+            "amount": "1500",
+            "provider": "MTN",
+            "ussd_instruction": "Simulation USSD test."
+        }
+        res_direct_momo = direct_client.post("/api/v1/payments/momo/initiate", json={
+            "plan_id": "plan_family",
+            "tier": "FAMILY",
+            "billing_cycle": "monthly",
+            "method": "MTN_MOMO",
+            "phone_number": "+242069998877",
+            "amount_fcfa": 1500,
+            "user_id": victim_id # tentative d'usurpation de compte
+        })
     assert res_direct_momo.status_code == 200
     
     # Vérifions en base que l'utilisateur victime n'a pas été compromis
