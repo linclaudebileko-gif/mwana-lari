@@ -63,6 +63,8 @@ class Settings(BaseSettings):
     @property
     def normalized_database_url(self) -> str:
         url = self.DATABASE_URL
+        if os.getenv("VERCEL") and url == "sqlite:///./mwana_lari.db":
+            return "sqlite:////tmp/mwana_lari.db"
         # Cloud providers like Render / Heroku / Supabase might provide postgres://
         if url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql://", 1)
